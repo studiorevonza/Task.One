@@ -201,7 +201,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
         {/* Left Column - Logo Only */}
         <div className="hidden lg:flex flex-col items-center justify-center space-y-4">
           <img 
-            src="/one.png" 
+            src="/logo.png" 
             alt="tasq.one logo" 
             className="w-60 h-55 object-contain" 
             onError={(e) => {
@@ -227,7 +227,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
           <div className="lg:hidden text-center mb-8">
             <div className="flex flex-col items-center space-y-3">
               <img 
-                src="/one.png" 
+                src="/logo.png" 
                 alt="tasq.one logo" 
                 className="w-25 h-20 object-contain" 
                 onError={(e) => {

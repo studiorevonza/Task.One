@@ -57,7 +57,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isOpen, 
         <div className="p-6 flex justify-between items-center border-b border-slate-100">
           <div className="flex items-center gap-3">
              <img 
-               src="/one.png" 
+               src="/logo.png"
                alt="tasq.one logo" 
                className="w-15 h-13 object-contain" 
                onError={(e) => {
