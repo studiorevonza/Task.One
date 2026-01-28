@@ -83,6 +83,12 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
       }
     } catch (err: any) {
       setError(err.message || 'Something went wrong. Please try again.');
+      
+      // If it's a server connection error, provide additional guidance
+      if (err.message && err.message.includes('connect to server')) {
+        setError('Server connection failed. Please ensure the backend is running on port 3001.');
+      }
+      
       setLoading(false);
     }
   };
@@ -116,7 +122,50 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
         
         const userData: GoogleUser = await userInfoResponse.json();
         
-        // Check if user exists in our system
+        // Try to login/register through our API
+        try {
+          // Try login first
+          const loginResponse = await apiService.login(userData.email, '');
+          if (loginResponse.success) {
+            const loggedInUser: User = {
+              id: loginResponse.data.user.id.toString(),
+              name: loginResponse.data.user.name,
+              email: loginResponse.data.user.email,
+              role: 'Product Designer',
+              avatarUrl: loginResponse.data.user.avatar_url || '/logo.png',
+              joinDate: loginResponse.data.user.created_at
+            };
+            onLogin(loggedInUser);
+            return;
+          }
+        } catch (loginError) {
+          // If login fails, try registration
+          try {
+            const registerResponse = await apiService.register(
+              userData.name, 
+              userData.email, 
+              '' // Empty password for Google users
+            );
+            
+            if (registerResponse.success) {
+              const loggedInUser: User = {
+                id: registerResponse.data.user.id.toString(),
+                name: registerResponse.data.user.name,
+                email: registerResponse.data.user.email,
+                role: 'Product Designer',
+                avatarUrl: registerResponse.data.user.avatar_url || '/logo.png',
+                joinDate: registerResponse.data.user.created_at
+              };
+              onLogin(loggedInUser);
+              return;
+            }
+          } catch (registerError) {
+            // If both fail, fall back to localStorage (demo mode)
+            console.warn('API login failed, using localStorage fallback');
+          }
+        }
+        
+        // Fallback to localStorage for demo purposes
         const users: UserData[] = JSON.parse(localStorage.getItem('users') || '[]');
         let existingUser = users.find(u => u.email === userData.email);
         
@@ -139,6 +188,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
           name: existingUser.name,
           email: existingUser.email,
           role: 'Product Designer',
+          avatarUrl: '/logo.png',
           joinDate: existingUser.createdAt
         };
         
@@ -146,6 +196,11 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
       } catch (err) {
         setError('Failed to authenticate with Google. Please try again.');
         console.error('Google login error:', err);
+        
+        // If it's a server connection error, provide additional guidance
+        if (err instanceof Error && err.message.includes('connect to server')) {
+          setError('Server connection failed. Please ensure the backend is running on port 3001.');
+        }
       } finally {
         setGoogleLoading(false);
       }
