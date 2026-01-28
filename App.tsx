@@ -17,7 +17,7 @@ import { Menu, X, Bell } from 'lucide-react';
 import { format, differenceInCalendarDays } from 'date-fns';
 
 // Google OAuth Configuration
-const GOOGLE_CLIENT_ID = '436152930223-2p91794cslr6tqks1nlpekvqig2hn3ch.apps.googleusercontent.com';
+const GOOGLE_CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || '436152930223-2p91794cslr6tqks1nlpekvqig2hn3ch.apps.googleusercontent.com';
 
 const App: React.FC = () => {
   // Auth State
