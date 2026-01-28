@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { GoogleOAuthProvider } from '@react-oauth/google';
+import apiService from './services/apiService';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import TaskManager from './components/TaskManager';
@@ -25,6 +26,32 @@ const App: React.FC = () => {
     const saved = localStorage.getItem('tasq_user');
     return saved ? JSON.parse(saved) : null;
   });
+
+  // Check for existing authentication token
+  useEffect(() => {
+    const token = localStorage.getItem('authToken');
+    if (token && !user) {
+      // Try to get user profile
+      apiService.getProfile()
+        .then(response => {
+          if (response.success) {
+            const authenticatedUser: User = {
+              id: response.data.user.id.toString(),
+              name: response.data.user.name,
+              email: response.data.user.email,
+              role: 'Product Designer',
+              avatarUrl: response.data.user.avatar_url || '/logo.png',
+              joinDate: response.data.user.created_at
+            };
+            setUser(authenticatedUser);
+          }
+        })
+        .catch(() => {
+          // Token invalid, remove it
+          localStorage.removeItem('authToken');
+        });
+    }
+  }, []);
 
   // Initialize demo user if none exists
   useEffect(() => {
@@ -156,12 +183,14 @@ const App: React.FC = () => {
     setCurrentView('DASHBOARD');
     setSelectedProjectId(null);
     
-    // Clear localStorage except users
+    // Clear localStorage and API token
     const users = localStorage.getItem('users');
     localStorage.clear();
     if (users) {
       localStorage.setItem('users', users);
     }
+    localStorage.removeItem('authToken');
+    apiService.logout();
     
     console.log('User logged out successfully');
   };

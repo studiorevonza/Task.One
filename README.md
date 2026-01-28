@@ -8,6 +8,8 @@ A modern, intuitive task management application built with React, TypeScript, an
 - **Task Management** - Create, organize, and track tasks with ease
 - **Project Organization** - Group related tasks into projects
 - **Google Authentication** - Secure login with Google OAuth
+- **Full Backend API** - RESTful API with PostgreSQL database
+- **JWT Authentication** - Secure token-based authentication
 - **Responsive Design** - Works seamlessly on desktop and mobile
 - **Real-time Updates** - Live task status and progress tracking
 
@@ -17,6 +19,8 @@ A modern, intuitive task management application built with React, TypeScript, an
 - **Workflow Visualization** - Track task progress through different stages
 - **Workspace Intelligence** - AI-powered task suggestions and insights
 - **Brainstorming Tools** - Creative task ideation and planning
+- **Time Tracking** - Log time spent on tasks
+- **Category & Tag System** - Organize tasks with labels
 
 ## 🛠️ Tech Stack
 
@@ -34,9 +38,10 @@ A modern, intuitive task management application built with React, TypeScript, an
 ### Prerequisites
 - Node.js (v16 or higher)
 - npm or yarn
+- PostgreSQL database (for backend)
 - Google OAuth credentials (for authentication)
 
-### Setup Steps
+### Frontend Setup
 
 1. **Clone the repository**
    ```bash
@@ -61,11 +66,43 @@ A modern, intuitive task management application built with React, TypeScript, an
    npm run dev
    ```
 
-5. **Build for production**
+### Backend Setup
+
+1. **Database Setup**
+   - Install PostgreSQL
+   - Create database: `CREATE DATABASE tasq_one;`
+   - Run schema: `psql -U postgres -d tasq_one -f database/schema.sql`
+
+2. **Backend Configuration**
    ```bash
-   npm run build
-   npm run preview
+   cd backend
+   npm install
+   cp .env.example .env
+   # Edit .env with your database credentials
    ```
+
+3. **Start backend server**
+   ```bash
+   npm run dev
+   ```
+
+4. **Verify backend**
+   Visit: http://localhost:3001/api/health
+
+### Running Both Servers
+
+For development, run both servers:
+
+```bash
+# Terminal 1 - Backend
+cd backend
+npm run dev
+
+# Terminal 2 - Frontend
+npm run dev
+```
+
+Visit: http://localhost:3000
 
 ## 🔐 Google OAuth Setup
 

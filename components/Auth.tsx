@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useGoogleLogin } from '@react-oauth/google';
+import apiService from '../services/apiService';
 import { User } from '../types';
 import { Mail, Lock, User as UserIcon, ArrowRight, CheckCircle2, Eye, EyeOff, Chrome } from 'lucide-react';
 
@@ -37,92 +38,53 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
   const [error, setError] = useState('');
   const [googleLoading, setGoogleLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
-    // Simulate API delay
-    setTimeout(() => {
-      try {
-        if (mode === 'FORGOT_PASSWORD') {
-          // Validate email exists
-          const users: UserData[] = JSON.parse(localStorage.getItem('users') || '[]');
-          const userExists = users.some(u => u.email === email);
-          
-          if (!userExists) {
-            setError('No account found with this email address.');
-            setLoading(false);
-            return;
-          }
-          
-          setResetSent(true);
-          setLoading(false);
-          return;
-        }
-
-        if (mode === 'LOGIN') {
-          // Authenticate user
-          const users: UserData[] = JSON.parse(localStorage.getItem('users') || '[]');
-          const user = users.find(u => u.email === email && u.password === password);
-          
-          if (!user) {
-            setError('Invalid email or password.');
-            setLoading(false);
-            return;
-          }
-
-          // Convert to User type
-          const loggedInUser: User = {
-            id: user.id,
-            name: user.name,
-            email: user.email,
-            role: 'Product Designer',
-            joinDate: user.createdAt
-          };
-          
-          onLogin(loggedInUser);
-          return;
-        }
-
-        if (mode === 'SIGNUP') {
-          // Check if email already exists
-          const users: UserData[] = JSON.parse(localStorage.getItem('users') || '[]');
-          if (users.some(u => u.email === email)) {
-            setError('An account with this email already exists.');
-            setLoading(false);
-            return;
-          }
-
-          // Create new user
-          const newUser: UserData = {
-            id: 'u' + Date.now(),
-            name,
-            email,
-            password,
-            createdAt: new Date().toISOString()
-          };
-
-          // Save user
-          users.push(newUser);
-          localStorage.setItem('users', JSON.stringify(users));
-
-          // Auto-login
-          const loggedInUser: User = {
-            id: newUser.id,
-            name: newUser.name,
-            email: newUser.email,
-            role: 'Product Designer',
-            joinDate: newUser.createdAt
-          };
-          
-          onLogin(loggedInUser);
-        }
-      } catch (err) {
-        setError('Something went wrong. Please try again.');
+    try {
+      if (mode === 'FORGOT_PASSWORD') {
+        // TODO: Implement forgot password functionality
+        setResetSent(true);
         setLoading(false);
+        return;
       }
-    }, 1500);
+
+      if (mode === 'LOGIN') {
+        const response = await apiService.login(email, password);
+        if (response.success) {
+          const loggedInUser: User = {
+            id: response.data.user.id.toString(),
+            name: response.data.user.name,
+            email: response.data.user.email,
+            role: 'Product Designer',
+            avatarUrl: response.data.user.avatar_url || '/logo.png',
+            joinDate: new Date().toISOString()
+          };
+          onLogin(loggedInUser);
+        }
+        return;
+      }
+
+      if (mode === 'SIGNUP') {
+        const response = await apiService.register(name, email, password);
+        if (response.success) {
+          const loggedInUser: User = {
+            id: response.data.user.id.toString(),
+            name: response.data.user.name,
+            email: response.data.user.email,
+            role: 'Product Designer',
+            avatarUrl: response.data.user.avatar_url || '/logo.png',
+            joinDate: new Date().toISOString()
+          };
+          onLogin(loggedInUser);
+        }
+      }
+    } catch (err: any) {
+      setError(err.message || 'Something went wrong. Please try again.');
+      setLoading(false);
+    }
   };
 
   const switchMode = (newMode: AuthMode) => {
