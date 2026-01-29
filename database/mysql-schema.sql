@@ -1,3 +1,8 @@
+CREATE DATABASE tasq_one CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'tasq_user'@'localhost' IDENTIFIED BY 'your_secure_password';
+GRANT ALL PRIVILEGES ON tasq_one.* TO 'tasq_user'@'localhost';
+FLUSH PRIVILEGES;
+
 -- Database Schema for tasq.one
 -- MySQL Database Setup
 
