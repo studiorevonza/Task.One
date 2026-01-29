@@ -35,11 +35,11 @@ router.post('/register', registerValidation, async (req, res, next) => {
 
     // Check if user already exists
     const userExists = await db.query(
-      'SELECT id FROM users WHERE email = $1',
+      'SELECT id FROM users WHERE email = ?',
       [email]
     );
 
-    if (userExists.rows.length > 0) {
+    if (userExists && userExists.length > 0) {
       return res.status(409).json({
         success: false,
         message: 'User with this email already exists'
@@ -52,11 +52,17 @@ router.post('/register', registerValidation, async (req, res, next) => {
 
     // Create user
     const result = await db.query(
-      'INSERT INTO users (name, email, password_hash) VALUES ($1, $2, $3) RETURNING id, name, email, created_at',
+      'INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)',
       [name, email, hashedPassword]
     );
 
-    const user = result.rows[0];
+    // Get the created user
+    const newUser = await db.query(
+      'SELECT id, name, email, created_at FROM users WHERE email = ?',
+      [email]
+    );
+
+    const user = newUser[0];
 
     // Create JWT token
     const token = jwt.sign(
@@ -100,18 +106,18 @@ router.post('/login', loginValidation, async (req, res, next) => {
 
     // Find user
     const result = await db.query(
-      'SELECT id, name, email, password_hash, created_at FROM users WHERE email = $1',
+      'SELECT id, name, email, password_hash, created_at FROM users WHERE email = ?',
       [email]
     );
 
-    if (result.rows.length === 0) {
+    if (result.length === 0) {
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password'
       });
     }
 
-    const user = result.rows[0];
+    const user = result[0];
 
     // Verify password
     const isValidPassword = await bcrypt.compare(password, user.password_hash);
@@ -152,11 +158,11 @@ router.post('/login', loginValidation, async (req, res, next) => {
 router.get('/profile', authenticateToken, async (req, res, next) => {
   try {
     const result = await db.query(
-      'SELECT id, name, email, avatar_url, created_at FROM users WHERE id = $1',
+      'SELECT id, name, email, avatar_url, created_at FROM users WHERE id = ?',
       [req.user.userId]
     );
 
-    if (result.rows.length === 0) {
+    if (result.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'User not found'
@@ -166,7 +172,7 @@ router.get('/profile', authenticateToken, async (req, res, next) => {
     res.json({
       success: true,
       data: {
-        user: result.rows[0]
+        user: result[0]
       }
     });
 
@@ -181,22 +187,28 @@ router.put('/profile', authenticateToken, async (req, res, next) => {
     const { name, avatar_url } = req.body;
 
     const result = await db.query(
-      'UPDATE users SET name = $1, avatar_url = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING id, name, email, avatar_url, updated_at',
+      'UPDATE users SET name = ?, avatar_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
       [name, avatar_url, req.user.userId]
     );
 
-    if (result.rows.length === 0) {
+    if (result.affectedRows === 0) {
       return res.status(404).json({
         success: false,
         message: 'User not found'
       });
     }
 
+    // Get updated user
+    const updatedUser = await db.query(
+      'SELECT id, name, email, avatar_url, updated_at FROM users WHERE id = ?',
+      [req.user.userId]
+    );
+
     res.json({
       success: true,
       message: 'Profile updated successfully',
       data: {
-        user: result.rows[0]
+        user: updatedUser[0]
       }
     });
 
