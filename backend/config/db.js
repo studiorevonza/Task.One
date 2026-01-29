@@ -15,9 +15,6 @@ const pool = mysql.createPool({
   queueLimit: 0,
   // SSL configuration for production (Render)
   ssl: isProduction ? { rejectUnauthorized: false } : false,
-  // Additional options for production
-  acquireTimeout: 60000,
-  timeout: 60000,
 });
 
 

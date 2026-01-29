@@ -69,6 +69,8 @@ const initDbConnection = async () => {
     if (process.env.NODE_ENV !== 'production') {
       console.error('❌ Database connection failed - exiting');
       process.exit(1);
+    } else {
+      console.warn('⚠️ Database connection failed in production - server will start without database');
     }
   }
 };
@@ -199,7 +201,7 @@ app.listen(PORT, () => {
   if (dbConnected) {
     console.log('✅ Database: Connected');
   } else {
-    console.log('⚠️ Database: Connection pending (may connect later)');
+    console.log('⚠️ Database: Not connected (using in-memory storage)');
   }
 });
 
