@@ -51,6 +51,11 @@ class ApiService {
         throw new Error('Unable to connect to server. Please make sure the backend is running.');
       }
       
+      // Handle specific API errors
+      if (error.message.includes('ECONNREFUSED')) {
+        throw new Error('Database connection failed. Using local storage fallback.');
+      }
+      
       throw error;
     }
   }
@@ -84,6 +89,32 @@ class ApiService {
 
   async getProfile() {
     return await this.request('/auth/profile');
+  }
+
+  async getUserProfile(userId) {
+    return await this.request(`/users/${userId}/profile`);
+  }
+
+  async getUserAnalytics(userId) {
+    return await this.request(`/users/${userId}/analytics`);
+  }
+
+  async getUserSecuritySettings(userId) {
+    return await this.request(`/users/${userId}/security`);
+  }
+
+  async updateUserProfile(userId, profileData) {
+    return await this.request(`/users/${userId}/profile`, {
+      method: 'PUT',
+      body: JSON.stringify(profileData)
+    });
+  }
+
+  async updateUserSecuritySettings(userId, securityData) {
+    return await this.request(`/users/${userId}/security`, {
+      method: 'PUT',
+      body: JSON.stringify(securityData)
+    });
   }
 
   async updateProfile(userData) {

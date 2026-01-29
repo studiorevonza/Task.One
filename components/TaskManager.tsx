@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { Task, TaskStatus, Priority, Category } from '../types';
 // Added Save to the list of imports from lucide-react
-import { Plus, Trash2, Filter, Calendar, AlertTriangle, Link, Lock, X, Flag, Tag, Check, Bell, Clock, Edit2, Search, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Save } from 'lucide-react';
+import { Plus, Trash2, Filter, Calendar, AlertTriangle, Link, Lock, X, Flag, Tag, Check, Bell, Clock, Edit2, Search, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Save, Target, FileText, Rocket } from 'lucide-react';
 import { format, isPast, isToday, isValid } from 'date-fns';
 
 interface TaskManagerProps {
@@ -469,122 +469,185 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, addTask, updateTaskSta
             </div>
 
             <form onSubmit={handleSaveTask} className="flex flex-col flex-1 overflow-hidden">
-                <div className="p-8 overflow-y-auto space-y-6 custom-scrollbar">
+                <div className="p-8 pb-6 overflow-y-auto space-y-6 custom-scrollbar">
+                    {/* Header Section */}
+                    <div className="text-center mb-2">
+                        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg shadow-indigo-500/20 mb-4">
+                            <Plus className="text-white" size={28} strokeWidth={3} />
+                        </div>
+                        <h3 className="text-2xl font-black text-slate-900 mb-1">Create New Task</h3>
+                        <p className="text-slate-500 text-sm font-medium">Define your objectives and organize your workflow</p>
+                    </div>
+
                     {/* Title Input */}
-                    <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Task Identification</label>
-                        <input 
-                        type="text" 
-                        required
-                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-slate-900 font-bold focus:ring-4 focus:ring-slate-900/5 focus:border-slate-400 focus:bg-white transition-all outline-none placeholder:text-slate-300 text-lg"
-                        value={newTaskTitle}
-                        onChange={(e) => setNewTaskTitle(e.target.value)}
-                        placeholder="Define the primary action..."
-                        autoFocus
-                        />
-                    </div>
-
-                    {/* Grid for Priority & Category */}
-                    <div className="grid grid-cols-2 gap-5">
-                        <div>
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Strategic Priority</label>
-                            <div className="relative">
-                                <select 
-                                    className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-2xl p-4 pr-10 text-slate-700 font-bold focus:ring-4 focus:ring-slate-900/5 focus:border-slate-400 outline-none transition-all"
-                                    value={newTaskPriority}
-                                    onChange={(e) => setNewTaskPriority(e.target.value as Priority)}
-                                >
-                                    {Object.values(Priority).map(p => <option key={p} value={p}>{p}</option>)}
-                                </select>
-                                <Flag className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
-                            </div>
+                    <div className="space-y-2">
+                        <div className="flex items-center gap-2 mb-1">
+                            <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
+                            <label className="text-xs font-black text-slate-600 uppercase tracking-widest">Task Identification</label>
                         </div>
-                        <div>
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Domain</label>
-                            <div className="relative">
-                                <select 
-                                    className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-2xl p-4 pr-10 text-slate-700 font-bold focus:ring-4 focus:ring-slate-900/5 focus:border-slate-400 outline-none transition-all"
-                                    value={newTaskCategory}
-                                    onChange={(e) => setNewTaskCategory(e.target.value as Category)}
-                                >
-                                    {Object.values(Category).map(c => <option key={c} value={c}>{c}</option>)}
-                                </select>
-                                <Tag className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
-                            </div>
+                        <div className="relative">
+                            <input 
+                            type="text" 
+                            required
+                            className="w-full bg-white border-2 border-slate-200 rounded-2xl px-5 py-4 text-slate-900 font-bold focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all outline-none placeholder:text-slate-400 text-lg shadow-sm hover:shadow-md"
+                            value={newTaskTitle}
+                            onChange={(e) => setNewTaskTitle(e.target.value)}
+                            placeholder="Define the primary action..."
+                            autoFocus
+                            />
+                            <Target className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
                         </div>
                     </div>
 
-                    {/* Deadline & Reminder Row */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        <div className="flex flex-col gap-2">
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1">Due Date & Time</label>
-                            <div className="flex gap-2">
-                                <div className="relative flex-1">
-                                    <input 
-                                    type="date" 
-                                    required
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 pl-12 text-slate-700 font-bold focus:ring-4 focus:ring-slate-900/5 focus:border-slate-400 outline-none transition-all"
-                                    value={newTaskDueDate}
-                                    onChange={(e) => setNewTaskDueDate(e.target.value)}
-                                    />
-                                    <Calendar size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                                </div>
-                                <div className="relative w-32">
-                                    <input 
-                                    type="time" 
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-slate-700 font-bold focus:ring-4 focus:ring-slate-900/5 focus:border-slate-400 outline-none transition-all"
-                                    value={newTaskDueTime}
-                                    onChange={(e) => setNewTaskDueTime(e.target.value)}
-                                    />
-                                </div>
-                            </div>
+                    {/* Priority Selection */}
+                    <div className="space-y-2">
+                        <div className="flex items-center gap-2 mb-1">
+                            <div className="w-2 h-2 rounded-full bg-orange-500"></div>
+                            <label className="text-xs font-black text-slate-600 uppercase tracking-widest">Strategic Priority</label>
+                        </div>
+                        <div className="grid grid-cols-3 gap-3">
+                            {Object.values(Priority).map((priority) => (
+                                <button
+                                    key={priority}
+                                    type="button"
+                                    onClick={() => setNewTaskPriority(priority)}
+                                    className={`p-4 rounded-2xl border-2 transition-all text-center font-bold ${newTaskPriority === priority 
+                                        ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-md' 
+                                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'}`}
+                                >
+                                    {priority}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Category Selection */}
+                    <div className="space-y-2">
+                        <div className="flex items-center gap-2 mb-1">
+                            <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                            <label className="text-xs font-black text-slate-600 uppercase tracking-widest">Domain</label>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                            {Object.values(Category).map((category) => (
+                                <button
+                                    key={category}
+                                    type="button"
+                                    onClick={() => setNewTaskCategory(category)}
+                                    className={`p-4 rounded-2xl border-2 transition-all text-center font-bold flex items-center justify-center gap-2 ${newTaskCategory === category 
+                                        ? 'border-green-500 bg-green-50 text-green-700 shadow-md' 
+                                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'}`}
+                                >
+                                    <Tag size={16} />
+                                    {category}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Timeline Section */}
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2 mb-1">
+                            <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                            <label className="text-xs font-black text-slate-600 uppercase tracking-widest">Timeline Configuration</label>
                         </div>
                         
-                        <div>
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Proactive Alert</label>
-                            <div className="relative">
-                                <select 
-                                    className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-2xl p-4 pr-10 text-slate-700 font-bold focus:ring-4 focus:ring-slate-900/5 focus:border-slate-400 outline-none transition-all"
-                                    value={newTaskReminder}
-                                    onChange={(e) => setNewTaskReminder(parseInt(e.target.value))}
-                                >
-                                    <option value={0}>No Reminder</option>
-                                    <option value={15}>15m Before</option>
-                                    <option value={60}>1h Before</option>
-                                    <option value={1440}>24h Before</option>
-                                </select>
-                                <Bell className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Due Date & Time */}
+                            <div className="space-y-3">
+                                <div className="text-xs font-bold text-slate-700 flex items-center gap-2">
+                                    <Calendar size={16} className="text-blue-500" />
+                                    Due Date & Time
+                                </div>
+                                <div className="flex gap-2">
+                                    <div className="relative flex-1">
+                                        <input 
+                                        type="date" 
+                                        required
+                                        className="w-full bg-white border-2 border-slate-200 rounded-2xl px-5 py-4 pl-12 text-slate-700 font-bold focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all shadow-sm hover:shadow-md"
+                                        value={newTaskDueDate}
+                                        onChange={(e) => setNewTaskDueDate(e.target.value)}
+                                        />
+                                        <Calendar size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                                    </div>
+                                    <div className="relative w-32">
+                                        <input 
+                                        type="time" 
+                                        className="w-full bg-white border-2 border-slate-200 rounded-2xl px-4 py-4 text-slate-700 font-bold focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all shadow-sm hover:shadow-md"
+                                        value={newTaskDueTime}
+                                        onChange={(e) => setNewTaskDueTime(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            {/* Proactive Alert */}
+                            <div className="space-y-3">
+                                <div className="text-xs font-bold text-slate-700 flex items-center gap-2">
+                                    <Bell size={16} className="text-amber-500" />
+                                    Proactive Alert
+                                </div>
+                                <div className="relative">
+                                    <select 
+                                        className="w-full appearance-none bg-white border-2 border-slate-200 rounded-2xl px-5 py-4 pr-12 text-slate-700 font-bold focus:ring-4 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all shadow-sm hover:shadow-md"
+                                        value={newTaskReminder}
+                                        onChange={(e) => setNewTaskReminder(parseInt(e.target.value))}
+                                    >
+                                        <option value={0}>No Reminder</option>
+                                        <option value={15}>15 Minutes Before</option>
+                                        <option value={60}>1 Hour Before</option>
+                                        <option value={1440}>1 Day Before</option>
+                                    </select>
+                                    <Bell className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={20} />
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    {/* Description */}
-                    <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Contextual Details</label>
-                        <textarea 
-                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-slate-700 font-medium focus:ring-4 focus:ring-slate-900/5 focus:border-slate-400 focus:bg-white outline-none transition-all resize-none min-h-[100px] placeholder:text-slate-300"
-                        value={newTaskDesc}
-                        onChange={(e) => setNewTaskDesc(e.target.value)}
-                        placeholder="Add sub-tasks, notes, or technical requirements..."
-                        />
+                    {/* Contextual Details */}
+                    <div className="space-y-2">
+                        <div className="flex items-center gap-2 mb-1">
+                            <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+                            <label className="text-xs font-black text-slate-600 uppercase tracking-widest">Contextual Details</label>
+                        </div>
+                        <div className="relative">
+                            <textarea 
+                            className="w-full bg-white border-2 border-slate-200 rounded-2xl px-5 py-4 text-slate-700 font-medium focus:ring-4 focus:ring-purple-500/20 focus:border-purple-500 focus:bg-white outline-none transition-all resize-none min-h-[120px] placeholder:text-slate-400 shadow-sm hover:shadow-md"
+                            value={newTaskDesc}
+                            onChange={(e) => setNewTaskDesc(e.target.value)}
+                            placeholder="Add sub-tasks, notes, or technical requirements..."
+                            />
+                            <FileText className="absolute right-4 bottom-4 text-slate-400" size={20} />
+                        </div>
                     </div>
 
-                    {/* Dependencies */}
-                    <div>
-                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1 flex justify-between items-center">
-                            <span>Dependency Mesh</span>
-                            <span className="bg-slate-100 text-slate-500 text-[8px] px-2 py-0.5 rounded-full font-black border border-slate-200">OPTIONAL</span>
-                        </label>
+                    {/* Dependency Selection */}
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between mb-1">
+                            <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-cyan-500"></div>
+                                <label className="text-xs font-black text-slate-600 uppercase tracking-widest">Dependency Mesh</label>
+                            </div>
+                            <span className="bg-slate-100 text-slate-500 text-[9px] px-2.5 py-1 rounded-full font-black border border-slate-200">OPTIONAL</span>
+                        </div>
                         
-                        <div className="border border-slate-200 rounded-[2rem] overflow-hidden bg-slate-50/30">
-                            <div className="max-h-40 overflow-y-auto p-2 custom-scrollbar">
+                        <div className="border-2 border-dashed border-slate-200 rounded-2xl overflow-hidden bg-slate-50/20 transition-all hover:border-slate-300">
+                            <div className="max-h-44 overflow-y-auto p-3 custom-scrollbar">
                                 {tasks.filter(t => t.id !== editingTaskId).length === 0 ? (
-                                    <div className="p-8 text-center text-slate-400 text-xs italic font-medium">Zero alternative nodes detected.</div>
+                                    <div className="p-6 text-center">
+                                        <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-slate-100 mb-3">
+                                            <Link size={24} className="text-slate-400" />
+                                        </div>
+                                        <p className="text-slate-400 text-sm font-medium">No other tasks available for dependency linking</p>
+                                    </div>
                                 ) : (
                                     tasks.filter(t => t.id !== editingTaskId).map(t => (
-                                        <label key={t.id} className={`flex items-center gap-4 p-3.5 rounded-2xl cursor-pointer transition-all border border-transparent group mb-1 last:mb-0 ${newTaskDependencies.includes(t.id) ? 'bg-indigo-50/50 border-indigo-100 shadow-sm' : 'hover:bg-white hover:shadow-sm'}`}>
-                                            <div className={`w-6 h-6 rounded-lg border flex items-center justify-center transition-all shrink-0 ${newTaskDependencies.includes(t.id) ? 'bg-slate-900 border-slate-900 text-white shadow-md' : 'border-slate-200 bg-white group-hover:border-slate-400'}`}>
-                                                {newTaskDependencies.includes(t.id) && <Check size={14} strokeWidth={4} />}
+                                        <label key={t.id} className={`flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all border-2 mb-2 last:mb-0 ${newTaskDependencies.includes(t.id) 
+                                            ? 'bg-indigo-50 border-indigo-200 shadow-sm' 
+                                            : 'border-transparent hover:bg-white hover:border-slate-200 hover:shadow-sm'}`}>
+                                            <div className={`w-7 h-7 rounded-xl border-2 flex items-center justify-center transition-all shrink-0 ${newTaskDependencies.includes(t.id) 
+                                                ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' 
+                                                : 'border-slate-300 bg-white group-hover:border-indigo-300'}`}>
+                                                {newTaskDependencies.includes(t.id) && <Check size={16} strokeWidth={4} />}
                                             </div>
                                             <input 
                                                 type="checkbox" 
@@ -593,7 +656,14 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, addTask, updateTaskSta
                                                 onChange={() => toggleDependency(t.id)}
                                             />
                                             <div className="flex-1 min-w-0">
-                                                <div className={`text-sm font-bold truncate ${newTaskDependencies.includes(t.id) ? 'text-indigo-900' : 'text-slate-700'}`}>{t.title}</div>
+                                                <div className={`font-bold truncate ${newTaskDependencies.includes(t.id) ? 'text-indigo-800' : 'text-slate-700'}`}>{t.title}</div>
+                                                <div className="text-xs text-slate-500 mt-1 flex items-center gap-2">
+                                                    <span className={`inline-block w-2 h-2 rounded-full ${t.status === TaskStatus.DONE ? 'bg-green-500' : t.status === TaskStatus.IN_PROGRESS ? 'bg-blue-500' : 'bg-slate-300'}`}></span>
+                                                    {t.status.replace('_', ' ').toLowerCase()}
+                                                </div>
+                                            </div>
+                                            <div className="text-xs font-bold text-slate-400">
+                                                {t.category}
                                             </div>
                                         </label>
                                     ))
@@ -604,20 +674,30 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, addTask, updateTaskSta
                 </div>
 
                 {/* Modal Footer */}
-                <div className="p-6 border-t border-slate-100 bg-slate-50/30 flex justify-end gap-3 px-8">
+                <div className="p-6 border-t border-slate-200 bg-gradient-to-r from-slate-50/50 to-white flex justify-end gap-4 px-8">
                     <button 
                         type="button" 
                         onClick={() => { setIsModalOpen(false); resetForm(); }}
-                        className="px-6 py-3 text-slate-600 font-bold hover:bg-white hover:shadow-sm hover:text-slate-900 rounded-2xl transition-all text-sm uppercase tracking-widest border border-transparent hover:border-slate-200"
+                        className="px-7 py-3.5 text-slate-600 font-bold hover:bg-slate-100 hover:text-slate-800 rounded-2xl transition-all text-sm uppercase tracking-wider border border-slate-200 hover:border-slate-300 flex items-center gap-2"
                     >
+                        <X size={18} />
                         Cancel
                     </button>
                     <button 
                         type="submit" 
-                        className="px-8 py-3 bg-slate-900 text-white font-bold rounded-2xl hover:bg-black shadow-xl shadow-slate-900/10 active:scale-95 transition-all text-xs uppercase tracking-widest flex items-center gap-2"
+                        className="px-8 py-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold rounded-2xl hover:from-indigo-700 hover:to-purple-700 shadow-xl shadow-indigo-500/20 active:scale-95 transition-all text-sm uppercase tracking-wider flex items-center gap-2 min-w-[180px] justify-center"
                     >
-                        {editingTaskId ? <Save size={18} /> : <Plus size={18} strokeWidth={3} />}
-                        {editingTaskId ? 'Commit Changes' : 'Initialize Task'}
+                        {editingTaskId ? (
+                            <>
+                                <Save size={18} strokeWidth={3} />
+                                Save Changes
+                            </>
+                        ) : (
+                            <>
+                                <Rocket size={18} strokeWidth={3} />
+                                Launch Task
+                            </>
+                        )}
                     </button>
                 </div>
             </form>

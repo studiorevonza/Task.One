@@ -17,7 +17,6 @@ const { errorHandler } = require('./middleware/errorHandler');
 const { notFound } = require('./middleware/notFound');
 
 const app = express();
-const PORT = process.env.PORT || 3001;
 
 // Security middleware
 app.use(helmet());
@@ -43,11 +42,114 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-  res.status(200).json({
+  res.json({
     status: 'OK',
     timestamp: new Date().toISOString(),
-    uptime: process.uptime()
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || 'development',
+    version: process.env.npm_package_version || '1.0.0'
   });
+});
+
+// Add temporary in-memory storage for user profiles
+const userProfiles = new Map();
+const userSecurity = new Map();
+
+// Mock user profile endpoints (temporary until database is ready)
+app.get('/api/users/:userId/profile', (req, res) => {
+  try {
+    const { userId } = req.params;
+    const profile = userProfiles.get(userId) || {
+      name: req.user?.name || 'User',
+      role: 'User',
+      location: 'San Francisco, CA',
+      bio: 'Product Designer passionate about creating exceptional digital experiences',
+      website: `tasq.one/u/${userId}`,
+      avatar: ''
+    };
+    
+    res.json({
+      success: true,
+      data: profile
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch profile'
+    });
+  }
+});
+
+app.put('/api/users/:userId/profile', (req, res) => {
+  try {
+    const { userId } = req.params;
+    const profileData = req.body;
+    
+    // Store in memory
+    userProfiles.set(userId, {
+      ...profileData,
+      updatedAt: new Date().toISOString()
+    });
+    
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      data: profileData
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update profile'
+    });
+  }
+});
+
+app.get('/api/users/:userId/security', (req, res) => {
+  try {
+    const { userId } = req.params;
+    const security = userSecurity.get(userId) || {
+      twoFactorEnabled: true,
+      biometricEnabled: true,
+      notificationsEnabled: true,
+      emailNotifications: true,
+      smsNotifications: false,
+      pushNotifications: true
+    };
+    
+    res.json({
+      success: true,
+      data: security
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch security settings'
+    });
+  }
+});
+
+app.put('/api/users/:userId/security', (req, res) => {
+  try {
+    const { userId } = req.params;
+    const securityData = req.body;
+    
+    // Store in memory
+    userSecurity.set(userId, {
+      ...securityData,
+      updatedAt: new Date().toISOString()
+    });
+    
+    res.json({
+      success: true,
+      message: 'Security settings updated successfully',
+      data: securityData
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update security settings'
+    });
+  }
 });
 
 // API Routes
@@ -64,9 +166,10 @@ app.use(notFound);
 app.use(errorHandler);
 
 // Start server
+const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📡 Environment: ${process.env.NODE_ENV}`);
+  console.log(`📡 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🔗 API Health: http://localhost:${PORT}/api/health`);
 });
 

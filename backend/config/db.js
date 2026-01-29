@@ -1,24 +1,27 @@
-const { Pool } = require('pg');
+const mysql = require('mysql2/promise');
 require('dotenv').config();
 
-const pool = new Pool({
+const pool = mysql.createPool({
   host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT) || 5432,
+  port: parseInt(process.env.DB_PORT) || 3306,
   database: process.env.DB_NAME || 'tasq_one',
-  user: process.env.DB_USER || 'postgres',
+  user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
+  ssl: process.env.NODE_ENV === 'production' ? 'Amazon RDS' : false
 });
 
 // Test database connection
-pool.query('SELECT NOW()', (err, res) => {
-  if (err) {
-    console.error('❌ Database connection error:', err.stack);
-  } else {
+pool.getConnection()
+  .then(connection => {
     console.log('✅ Database connected successfully');
-    console.log('🕒 Server time:', res.rows[0].now);
-  }
-});
+    connection.release();
+  })
+  .catch(err => {
+    console.error('❌ Database connection error:', err.stack);
+  });
 
 // Handle pool errors
 pool.on('error', (err) => {
@@ -27,7 +30,12 @@ pool.on('error', (err) => {
 });
 
 module.exports = {
-  query: (text, params) => pool.query(text, params),
-  getClient: () => pool.connect(),
+  query: async (text, params) => {
+    const [rows] = await pool.execute(text, params);
+    return rows;
+  },
+  getClient: async () => {
+    return await pool.getConnection();
+  },
   pool
 };
