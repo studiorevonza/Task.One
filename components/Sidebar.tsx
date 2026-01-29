@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { View } from '../types';
 import { LayoutDashboard, FolderKanban, CheckSquare, Calendar, BarChart3, X, User as UserIcon, LogOut, AlertTriangle } from 'lucide-react';
+import Logo from './Logo';
 
 interface SidebarProps {
   currentView: View;
@@ -56,19 +57,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isOpen, 
         {/* Logo Area */}
         <div className="p-6 flex justify-between items-center border-b border-slate-100">
           <div className="flex items-center gap-3">
-             <img 
-               src="/logo.png"
-               alt="tasq.one logo" 
-               className="w-15 h-13 object-contain" 
-               onError={(e) => {
-                 console.error('Sidebar logo failed to load:', e);
-                 e.currentTarget.style.display = 'none';
-                 const fallback = document.createElement('div');
-                 fallback.className = 'text-xl font-bold text-slate-900';
-                 fallback.textContent = 'T';
-                 e.currentTarget.parentNode?.appendChild(fallback);
-               }}
-             />
+            <Logo size="md" />
           </div>
           <button 
             onClick={onClose}

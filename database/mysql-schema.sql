@@ -175,7 +175,7 @@ CREATE TRIGGER projects_updated_at_trigger
 BEFORE UPDATE ON projects
 FOR EACH ROW
 BEGIN
-    SET NEW.updated_at = CURRENT_TIMESTAMP;
+    SET NEW.updated_at = CURRavatar_urlavatar_urlENT_TIMESTAMP;
 END$$
 
 CREATE TRIGGER tasks_updated_at_trigger 
@@ -192,3 +192,6 @@ BEGIN
     SET NEW.updated_at = CURRENT_TIMESTAMP;
 END$$
 DELIMITER ;
+
+
+select avatar_url from users;

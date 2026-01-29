@@ -3,6 +3,7 @@ import { useGoogleLogin } from '@react-oauth/google';
 import apiService from '../services/apiService';
 import { User } from '../types';
 import { Mail, Lock, User as UserIcon, ArrowRight, CheckCircle2, Eye, EyeOff, Chrome } from 'lucide-react';
+import Logo from './Logo';
 
 interface AuthProps {
   onLogin: (user: User) => void;
@@ -59,7 +60,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
             name: response.data.user.name,
             email: response.data.user.email,
             role: 'Product Designer',
-            avatarUrl: response.data.user.avatar_url || '/logo.png',
+            avatarUrl: response.data.user.avatar_url || '/logo.svg',
             joinDate: new Date().toISOString()
           };
           onLogin(loggedInUser);
@@ -75,7 +76,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
             name: response.data.user.name,
             email: response.data.user.email,
             role: 'Product Designer',
-            avatarUrl: response.data.user.avatar_url || '/logo.png',
+            avatarUrl: response.data.user.avatar_url || '/logo.svg',
             joinDate: new Date().toISOString()
           };
           onLogin(loggedInUser);
@@ -132,7 +133,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
               name: loginResponse.data.user.name,
               email: loginResponse.data.user.email,
               role: 'Product Designer',
-              avatarUrl: loginResponse.data.user.avatar_url || '/logo.png',
+              avatarUrl: loginResponse.data.user.avatar_url || '/logo.svg',
               joinDate: loginResponse.data.user.created_at
             };
             onLogin(loggedInUser);
@@ -153,7 +154,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
                 name: registerResponse.data.user.name,
                 email: registerResponse.data.user.email,
                 role: 'Product Designer',
-                avatarUrl: registerResponse.data.user.avatar_url || '/logo.png',
+                avatarUrl: registerResponse.data.user.avatar_url || '/logo.svg',
                 joinDate: registerResponse.data.user.created_at
               };
               onLogin(loggedInUser);
@@ -188,7 +189,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
           name: existingUser.name,
           email: existingUser.email,
           role: 'Product Designer',
-          avatarUrl: '/logo.png',
+          avatarUrl: '/logo.svg',
           joinDate: existingUser.createdAt
         };
         
@@ -217,21 +218,9 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
         
         {/* Left Column - Logo Only */}
         <div className="hidden lg:flex flex-col items-center justify-center space-y-4">
-          <img 
-            src="/logo.png" 
-            alt="tasq.one logo" 
-            className="w-60 h-55 object-contain" 
-            onError={(e) => {
-              console.error('Logo failed to load:', e);
-              e.currentTarget.style.display = 'none';
-              const fallback = document.createElement('div');
-              fallback.className = 'text-5xl font-bold text-slate-900';
-              fallback.textContent = 'T';
-              e.currentTarget.parentNode?.appendChild(fallback);
-            }}
-          />
+          <Logo size="xl" />
           <div className="text-center">
-            <p className="text-slate-600 text-base font-light max-w-xs mt-2">
+            <p className="text-slate-600 text-base font-light max-w-xs mt-1">
               Smart task management for focused productivity
             </p>
           </div>
@@ -241,21 +230,9 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
         <div className="bg-white rounded-lg p-8 w-full max-w-md mx-auto flex flex-col items-center">
           
           {/* Mobile Header with Logo */}
-          <div className="lg:hidden text-center mb-8">
-            <div className="flex flex-col items-center space-y-3">
-              <img 
-                src="/logo.png" 
-                alt="tasq.one logo" 
-                className="w-25 h-20 object-contain" 
-                onError={(e) => {
-                  console.error('Logo failed to load:', e);
-                  e.currentTarget.style.display = 'none';
-                  const fallback = document.createElement('div');
-                  fallback.className = 'text-2xl font-bold text-slate-900';
-                  fallback.textContent = 'T';
-                  e.currentTarget.parentNode?.appendChild(fallback);
-                }}
-              />
+          <div className="lg:hidden text-center mb-4">
+            <div className="flex flex-col items-center space-y-2">
+              <Logo size="lg" />
               
             </div>
           </div>

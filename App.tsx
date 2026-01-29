@@ -40,7 +40,7 @@ const App: React.FC = () => {
               name: response.data.user.name,
               email: response.data.user.email,
               role: 'Product Designer',
-              avatarUrl: response.data.user.avatar_url || '/logo.png',
+              avatarUrl: response.data.user.avatar_url || '/logo.svg',
               joinDate: response.data.user.created_at
             };
             setUser(authenticatedUser);
