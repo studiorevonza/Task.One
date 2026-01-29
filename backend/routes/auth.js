@@ -229,4 +229,68 @@ router.put('/profile', authenticateToken, async (req, res, next) => {
   }
 });
 
+// Google OAuth login/register endpoint
+router.post('/google', async (req, res, next) => {
+  try {
+    const { email, name, googleId, picture } = req.body;
+    
+    if (!email || !name) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and name are required'
+      });
+    }
+    
+    // Check if user already exists
+    let user = await db.query(
+      'SELECT id, name, email, avatar_url, created_at FROM users WHERE email = ?',
+      [email]
+    );
+    
+    if (user.length > 0) {
+      // User exists, return existing user
+      user = user[0];
+    } else {
+      // Create new user
+      await db.query(
+        'INSERT INTO users (name, email, password_hash, avatar_url) VALUES (?, ?, ?, ?)',
+        [name, email, '', picture || ''] // Empty password for Google users
+      );
+      
+      // Get the created user
+      const newUser = await db.query(
+        'SELECT id, name, email, avatar_url, created_at FROM users WHERE email = ?',
+        [email]
+      );
+      
+      user = newUser[0];
+    }
+    
+    // Create JWT token
+    const token = jwt.sign(
+      { userId: user.id, email: user.email },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
+    );
+    
+    res.json({
+      success: true,
+      message: user.id ? 'Login successful' : 'User created successfully',
+      data: {
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          avatar_url: user.avatar_url,
+          createdAt: user.created_at
+        },
+        token
+      }
+    });
+    
+  } catch (error) {
+    next(error);
+  }
+});
+
 module.exports = router;

@@ -125,45 +125,23 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
         
         // Try to login/register through our API
         try {
-          // Try login first
-          const loginResponse = await apiService.login(userData.email, '');
-          if (loginResponse.success) {
+          // Try Google login endpoint first
+          const googleResponse = await apiService.googleLogin(userData.email, userData.name, userData.sub, userData.picture);
+          if (googleResponse.success) {
             const loggedInUser: User = {
-              id: loginResponse.data.user.id.toString(),
-              name: loginResponse.data.user.name,
-              email: loginResponse.data.user.email,
+              id: googleResponse.data.user.id.toString(),
+              name: googleResponse.data.user.name,
+              email: googleResponse.data.user.email,
               role: 'Product Designer',
-              avatarUrl: loginResponse.data.user.avatar_url || '/logo.svg',
-              joinDate: loginResponse.data.user.created_at
+              avatarUrl: googleResponse.data.user.avatar_url || '/logo.svg',
+              joinDate: googleResponse.data.user.createdAt
             };
             onLogin(loggedInUser);
             return;
           }
-        } catch (loginError) {
-          // If login fails, try registration
-          try {
-            const registerResponse = await apiService.register(
-              userData.name, 
-              userData.email, 
-              '' // Empty password for Google users
-            );
-            
-            if (registerResponse.success) {
-              const loggedInUser: User = {
-                id: registerResponse.data.user.id.toString(),
-                name: registerResponse.data.user.name,
-                email: registerResponse.data.user.email,
-                role: 'Product Designer',
-                avatarUrl: registerResponse.data.user.avatar_url || '/logo.svg',
-                joinDate: registerResponse.data.user.created_at
-              };
-              onLogin(loggedInUser);
-              return;
-            }
-          } catch (registerError) {
-            // If both fail, fall back to localStorage (demo mode)
-            console.warn('API login failed, using localStorage fallback');
-          }
+        } catch (googleError) {
+          // If Google login fails, fall back to localStorage (demo mode)
+          console.warn('Google login API failed, using localStorage fallback');
         }
         
         // Fallback to localStorage for demo purposes

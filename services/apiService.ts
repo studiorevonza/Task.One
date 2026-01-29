@@ -1,5 +1,5 @@
 // API Service for tasq.one
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = '/api';  // Relative path works for both local and deployed versions
 
 class ApiService {
   private token: string | null;
@@ -78,6 +78,19 @@ class ApiService {
     const response = await this.request('/auth/register', {
       method: 'POST',
       body: JSON.stringify({ name, email, password })
+    });
+    
+    if (response.success && response.data.token) {
+      this.setAuthToken(response.data.token);
+    }
+    
+    return response;
+  }
+
+  async googleLogin(email, name, googleId, picture) {
+    const response = await this.request('/auth/google', {
+      method: 'POST',
+      body: JSON.stringify({ email, name, googleId, picture })
     });
     
     if (response.success && response.data.token) {
