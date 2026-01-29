@@ -7,8 +7,7 @@ services:
     branch: main
     buildCommand: |
       cd backend &&
-      npm install &&
-      npm run build
+      npm install
     startCommand: |
       cd backend &&
       npm start
@@ -20,7 +19,7 @@ services:
       - key: DB_HOST
         sync: false
       - key: DB_PORT
-        value: 5432
+        value: 3306
       - key: DB_NAME
         sync: false
       - key: DB_USER

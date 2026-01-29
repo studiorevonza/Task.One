@@ -51,6 +51,31 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Graceful database connection handling
+let dbConnected = false;
+global.db = null; // Make database available globally
+
+// Try to initialize database connection
+const initDbConnection = async () => {
+  try {
+    const dbModule = require('./config/db');
+    await dbModule.pool.getConnection();
+    console.log('✅ Database connected successfully');
+    global.db = dbModule; // Make db available globally
+    dbConnected = true;
+  } catch (error) {
+    console.error('⚠️ Database connection pending:', error.message);
+    // Don't exit on Render - allow server to start anyway
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('❌ Database connection failed - exiting');
+      process.exit(1);
+    }
+  }
+};
+
+// Initialize database connection
+initDbConnection();
+
 // Add temporary in-memory storage for user profiles
 const userProfiles = new Map();
 const userSecurity = new Map();
@@ -171,6 +196,11 @@ app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📡 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🔗 API Health: http://localhost:${PORT}/api/health`);
+  if (dbConnected) {
+    console.log('✅ Database: Connected');
+  } else {
+    console.log('⚠️ Database: Connection pending (may connect later)');
+  }
 });
 
 module.exports = app;

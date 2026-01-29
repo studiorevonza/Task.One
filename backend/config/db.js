@@ -1,6 +1,9 @@
 const mysql = require('mysql2/promise');
 require('dotenv').config();
 
+// Determine if we're in production
+const isProduction = process.env.NODE_ENV === 'production';
+
 const pool = mysql.createPool({
   host: process.env.DB_HOST || 'localhost',
   port: parseInt(process.env.DB_PORT) || 3306,
@@ -10,8 +13,13 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
-  ssl: process.env.NODE_ENV === 'production' ? 'Amazon RDS' : false
+  // SSL configuration for production (Render)
+  ssl: isProduction ? { rejectUnauthorized: false } : false,
+  // Additional options for production
+  acquireTimeout: 60000,
+  timeout: 60000,
 });
+
 
 // Test database connection
 pool.getConnection()

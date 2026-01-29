@@ -14,7 +14,7 @@ RUN npm install
 COPY . .
 
 # Expose port (Render will set PORT environment variable)
-EXPOSE $PORT
+EXPOSE 10000
 
 # Start the application
 CMD ["npm", "start"]

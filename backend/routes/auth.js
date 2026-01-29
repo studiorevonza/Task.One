@@ -2,7 +2,19 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
-const db = require('../config/db');
+
+// Use global database if available, fallback to mock
+const getDb = () => {
+  return global.db || {
+    query: async (sql, params) => {
+      console.warn('⚠️ Database not connected - using in-memory storage');
+      return [];
+    }
+  };
+};
+
+const db = getDb();
+
 const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();

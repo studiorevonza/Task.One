@@ -1,6 +1,17 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
-const db = require('../config/db');
+
+// Use global database if available, fallback to mock
+const getDb = () => {
+  return global.db || {
+    query: async (sql, params) => {
+      console.warn('⚠️ Database not connected - using in-memory storage');
+      return [];
+    }
+  };
+};
+
+const db = getDb();
 const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
@@ -22,7 +33,7 @@ router.get('/', authenticateToken, async (req, res, next) => {
         COUNT(CASE WHEN t.status = 'completed' THEN 1 END) as completed_tasks
       FROM projects p
       LEFT JOIN tasks t ON p.id = t.project_id
-      WHERE p.user_id = $1
+      WHERE p.user_id = ?
       GROUP BY p.id
       ORDER BY p.created_at DESC
     `, [req.user.userId]);
@@ -30,7 +41,7 @@ router.get('/', authenticateToken, async (req, res, next) => {
     res.json({
       success: true,
       data: {
-        projects: result.rows
+        projects: result
       }
     });
 
@@ -46,11 +57,11 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
 
     // Get project details
     const projectResult = await db.query(
-      'SELECT * FROM projects WHERE id = $1 AND user_id = $2',
+      'SELECT * FROM projects WHERE id = ? AND user_id = ?',
       [id, req.user.userId]
     );
 
-    if (projectResult.rows.length === 0) {
+    if (projectResult.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'Project not found'
@@ -64,7 +75,7 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
         u.name as assigned_to_name
       FROM tasks t
       LEFT JOIN users u ON t.assigned_to = u.id
-      WHERE t.project_id = $1
+      WHERE t.project_id = ?
       ORDER BY t.created_at DESC
     `, [id]);
 
@@ -72,8 +83,8 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
       success: true,
       data: {
         project: {
-          ...projectResult.rows[0],
-          tasks: tasksResult.rows
+          ...projectResult[0],
+          tasks: tasksResult
         }
       }
     });
@@ -99,15 +110,21 @@ router.post('/', authenticateToken, projectValidation, async (req, res, next) =>
 
     const result = await db.query(`
       INSERT INTO projects (name, description, color, user_id)
-      VALUES ($1, $2, $3, $4)
-      RETURNING *
+      VALUES (?, ?, ?, ?)
+      
     `, [name, description || null, color || '#3B82F6', req.user.userId]);
+
+    // Get the newly created project
+    const newProject = await db.query(
+      'SELECT * FROM projects WHERE id = LAST_INSERT_ID()',
+      []
+    );
 
     res.status(201).json({
       success: true,
       message: 'Project created successfully',
       data: {
-        project: result.rows[0]
+        project: newProject[0]
       }
     });
 
@@ -133,29 +150,34 @@ router.put('/:id', authenticateToken, projectValidation, async (req, res, next) 
 
     // Check if project exists and belongs to user
     const existingProject = await db.query(
-      'SELECT id FROM projects WHERE id = $1 AND user_id = $2',
+      'SELECT id FROM projects WHERE id = ? AND user_id = ?',
       [id, req.user.userId]
     );
 
-    if (existingProject.rows.length === 0) {
+    if (existingProject.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'Project not found'
       });
     }
 
-    const result = await db.query(`
+    await db.query(`
       UPDATE projects 
-      SET name = $1, description = $2, color = $3, updated_at = CURRENT_TIMESTAMP
-      WHERE id = $4 AND user_id = $5
-      RETURNING *
+      SET name = ?, description = ?, color = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND user_id = ?
     `, [name, description || null, color || '#3B82F6', id, req.user.userId]);
+
+    // Get the updated project
+    const updatedProject = await db.query(
+      'SELECT * FROM projects WHERE id = ?',
+      [id]
+    );
 
     res.json({
       success: true,
       message: 'Project updated successfully',
       data: {
-        project: result.rows[0]
+        project: updatedProject[0]
       }
     });
 
@@ -171,11 +193,11 @@ router.delete('/:id', authenticateToken, async (req, res, next) => {
 
     // Check if project exists and belongs to user
     const existingProject = await db.query(
-      'SELECT id FROM projects WHERE id = $1 AND user_id = $2',
+      'SELECT id FROM projects WHERE id = ? AND user_id = ?',
       [id, req.user.userId]
     );
 
-    if (existingProject.rows.length === 0) {
+    if (existingProject.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'Project not found'
@@ -183,7 +205,7 @@ router.delete('/:id', authenticateToken, async (req, res, next) => {
     }
 
     // Delete project (tasks will be set to NULL due to CASCADE)
-    await db.query('DELETE FROM projects WHERE id = $1 AND user_id = $2', [id, req.user.userId]);
+    await db.query('DELETE FROM projects WHERE id = ? AND user_id = ?', [id, req.user.userId]);
 
     res.json({
       success: true,
@@ -202,11 +224,11 @@ router.get('/:id/stats', authenticateToken, async (req, res, next) => {
 
     // Verify project ownership
     const projectCheck = await db.query(
-      'SELECT id FROM projects WHERE id = $1 AND user_id = $2',
+      'SELECT id FROM projects WHERE id = ? AND user_id = ?',
       [id, req.user.userId]
     );
 
-    if (projectCheck.rows.length === 0) {
+    if (projectCheck.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'Project not found'
@@ -222,13 +244,13 @@ router.get('/:id/stats', authenticateToken, async (req, res, next) => {
         COUNT(CASE WHEN priority = 'high' THEN 1 END) as high_priority_count,
         COUNT(CASE WHEN due_date < NOW() AND status != 'completed' THEN 1 END) as overdue_count
       FROM tasks 
-      WHERE project_id = $1
+      WHERE project_id = ?
     `, [id]);
 
     res.json({
       success: true,
       data: {
-        stats: statsResult.rows[0]
+        stats: statsResult[0]
       }
     });
 

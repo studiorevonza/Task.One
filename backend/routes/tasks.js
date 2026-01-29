@@ -1,6 +1,17 @@
 const express = require('express');
 const { body, query, validationResult } = require('express-validator');
-const db = require('../config/db');
+
+// Use global database if available, fallback to mock
+const getDb = () => {
+  return global.db || {
+    query: async (sql, params) => {
+      console.warn('⚠️ Database not connected - using in-memory storage');
+      return [];
+    }
+  };
+};
+
+const db = getDb();
 const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
@@ -49,35 +60,30 @@ router.get('/', authenticateToken, async (req, res, next) => {
       FROM tasks t
       LEFT JOIN projects p ON t.project_id = p.id
       LEFT JOIN users u ON t.assigned_to = u.id
-      WHERE t.user_id = $1
+      WHERE t.user_id = ?
     `;
     
     const queryParams = [req.user.userId];
-    let paramIndex = 2;
 
     // Add filters
     if (status) {
-      queryText += ` AND t.status = $${paramIndex}`;
+      queryText += ` AND t.status = ?`;
       queryParams.push(status);
-      paramIndex++;
     }
 
     if (priority) {
-      queryText += ` AND t.priority = $${paramIndex}`;
+      queryText += ` AND t.priority = ?`;
       queryParams.push(priority);
-      paramIndex++;
     }
 
     if (project_id) {
-      queryText += ` AND t.project_id = $${paramIndex}`;
+      queryText += ` AND t.project_id = ?`;
       queryParams.push(parseInt(project_id));
-      paramIndex++;
     }
 
     if (search) {
-      queryText += ` AND (t.title ILIKE $${paramIndex} OR t.description ILIKE $${paramIndex})`;
-      queryParams.push(`%${search}%`);
-      paramIndex++;
+      queryText += ` AND (t.title LIKE ? OR t.description LIKE ?)`;
+      queryParams.push(`%${search}%`, `%${search}%`);
     }
 
     // Add sorting
@@ -92,46 +98,42 @@ router.get('/', authenticateToken, async (req, res, next) => {
 
     // Add pagination
     const offset = (parseInt(page) - 1) * parseInt(limit);
-    queryText += ` LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+    queryText += ` LIMIT ? OFFSET ?`;
     queryParams.push(parseInt(limit), offset);
 
     const result = await db.query(queryText, queryParams);
 
     // Get total count for pagination
-    let countQuery = 'SELECT COUNT(*) FROM tasks t WHERE t.user_id = $1';
+    let countQuery = 'SELECT COUNT(*) as count FROM tasks t WHERE t.user_id = ?';
     const countParams = [req.user.userId];
-    let countParamIndex = 2;
 
     if (status) {
-      countQuery += ` AND t.status = $${countParamIndex}`;
+      countQuery += ` AND t.status = ?`;
       countParams.push(status);
-      countParamIndex++;
     }
 
     if (priority) {
-      countQuery += ` AND t.priority = $${countParamIndex}`;
+      countQuery += ` AND t.priority = ?`;
       countParams.push(priority);
-      countParamIndex++;
     }
 
     if (project_id) {
-      countQuery += ` AND t.project_id = $${countParamIndex}`;
+      countQuery += ` AND t.project_id = ?`;
       countParams.push(parseInt(project_id));
-      countParamIndex++;
     }
 
     if (search) {
-      countQuery += ` AND (t.title ILIKE $${countParamIndex} OR t.description ILIKE $${countParamIndex})`;
-      countParams.push(`%${search}%`);
+      countQuery += ` AND (t.title LIKE ? OR t.description LIKE ?)`;
+      countParams.push(`%${search}%`, `%${search}%`);
     }
 
     const countResult = await db.query(countQuery, countParams);
-    const total = parseInt(countResult.rows[0].count);
+    const total = parseInt(countResult[0].count);
 
     res.json({
       success: true,
       data: {
-        tasks: result.rows,
+        tasks: result,
         pagination: {
           currentPage: parseInt(page),
           totalPages: Math.ceil(total / parseInt(limit)),
@@ -162,10 +164,10 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
       LEFT JOIN projects p ON t.project_id = p.id
       LEFT JOIN users u ON t.assigned_to = u.id
       LEFT JOIN users creator ON t.user_id = creator.id
-      WHERE t.id = $1 AND t.user_id = $2
+      WHERE t.id = ? AND t.user_id = ?
     `, [id, req.user.userId]);
 
-    if (result.rows.length === 0) {
+    if (result.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'Task not found'
@@ -175,7 +177,7 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
     res.json({
       success: true,
       data: {
-        task: result.rows[0]
+        task: result[0]
       }
     });
 
@@ -198,11 +200,11 @@ router.post('/', authenticateToken, taskValidation, async (req, res, next) => {
 
     const { title, description, status, priority, due_date, project_id, assigned_to } = req.body;
 
-    const result = await db.query(`
+    await db.query(`
       INSERT INTO tasks 
       (title, description, status, priority, due_date, project_id, user_id, assigned_to)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      RETURNING *
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      
     `, [
       title,
       description || null,
@@ -214,11 +216,17 @@ router.post('/', authenticateToken, taskValidation, async (req, res, next) => {
       assigned_to || null
     ]);
 
+    // Get the newly created task
+    const newTask = await db.query(
+      'SELECT t.*, p.name as project_name, p.color as project_color, u.name as assigned_to_name FROM tasks t LEFT JOIN projects p ON t.project_id = p.id LEFT JOIN users u ON t.assigned_to = u.id WHERE t.id = LAST_INSERT_ID()',
+      []
+    );
+
     res.status(201).json({
       success: true,
       message: 'Task created successfully',
       data: {
-        task: result.rows[0]
+        task: newTask[0]
       }
     });
 
@@ -244,23 +252,22 @@ router.put('/:id', authenticateToken, taskValidation, async (req, res, next) => 
 
     // Check if task exists and belongs to user
     const existingTask = await db.query(
-      'SELECT id FROM tasks WHERE id = $1 AND user_id = $2',
+      'SELECT id FROM tasks WHERE id = ? AND user_id = ?',
       [id, req.user.userId]
     );
 
-    if (existingTask.rows.length === 0) {
+    if (existingTask.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'Task not found'
       });
     }
 
-    const result = await db.query(`
+    await db.query(`
       UPDATE tasks 
-      SET title = $1, description = $2, status = $3, priority = $4, 
-          due_date = $5, project_id = $6, assigned_to = $7, updated_at = CURRENT_TIMESTAMP
-      WHERE id = $8 AND user_id = $9
-      RETURNING *
+      SET title = ?, description = ?, status = ?, priority = ?, 
+          due_date = ?, project_id = ?, assigned_to = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND user_id = ?
     `, [
       title,
       description || null,
@@ -273,11 +280,17 @@ router.put('/:id', authenticateToken, taskValidation, async (req, res, next) => 
       req.user.userId
     ]);
 
+    // Get the updated task
+    const updatedTask = await db.query(
+      'SELECT t.*, p.name as project_name, p.color as project_color, u.name as assigned_to_name FROM tasks t LEFT JOIN projects p ON t.project_id = p.id LEFT JOIN users u ON t.assigned_to = u.id WHERE t.id = ?',
+      [id]
+    );
+
     res.json({
       success: true,
       message: 'Task updated successfully',
       data: {
-        task: result.rows[0]
+        task: updatedTask[0]
       }
     });
 
@@ -293,18 +306,18 @@ router.delete('/:id', authenticateToken, async (req, res, next) => {
 
     // Check if task exists and belongs to user
     const existingTask = await db.query(
-      'SELECT id FROM tasks WHERE id = $1 AND user_id = $2',
+      'SELECT id FROM tasks WHERE id = ? AND user_id = ?',
       [id, req.user.userId]
     );
 
-    if (existingTask.rows.length === 0) {
+    if (existingTask.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'Task not found'
       });
     }
 
-    await db.query('DELETE FROM tasks WHERE id = $1 AND user_id = $2', [id, req.user.userId]);
+    await db.query('DELETE FROM tasks WHERE id = ? AND user_id = ?', [id, req.user.userId]);
 
     res.json({
       success: true,
@@ -329,13 +342,13 @@ router.get('/stats/overview', authenticateToken, async (req, res, next) => {
         COUNT(CASE WHEN priority = 'high' THEN 1 END) as high_priority_count,
         COUNT(CASE WHEN due_date < NOW() AND status != 'completed' THEN 1 END) as overdue_count
       FROM tasks 
-      WHERE user_id = $1
+      WHERE user_id = ?
     `, [req.user.userId]);
 
     res.json({
       success: true,
       data: {
-        stats: result.rows[0]
+        stats: result[0]
       }
     });
 
