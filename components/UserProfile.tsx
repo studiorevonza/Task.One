@@ -510,30 +510,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, tasks, onLogout, onUpda
                     </div>
                  </div>
 
-                 <div className="mt-10 pt-10 border-t border-slate-100">
-                     <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6">Service Level</h4>
-                     <div className="bg-slate-900 p-8 rounded-[2rem] text-white shadow-2xl relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 p-12 opacity-5 group-hover:rotate-12 transition-transform duration-700">
-                           <Activity size={180} />
-                        </div>
-                        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
-                           <div>
-                              <div className="flex items-center gap-3 mb-2">
-                                 <p className="font-black text-2xl tracking-tight">{subscription.name}</p>
-                                 <span className={`${getStatusColor(subscription.status)} text-white text-[10px] font-black px-2 py-0.5 rounded-lg uppercase tracking-widest`}>
-                                   {getStatusText(subscription.status)}
-                                 </span>
-                              </div>
-                              <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">
-                                Cycle renewal: {format(parseISO(subscription.renewalDate), 'MMMM d, yyyy')}
-                              </p>
-                           </div>
-                           <button className="bg-white/10 hover:bg-white/20 text-white text-[10px] font-black uppercase tracking-widest px-6 py-3 rounded-2xl transition-all border border-white/10 active:scale-95">
-                              Modify Tier
-                           </button>
-                        </div>
-                     </div>
-                 </div>
+                 
               </div>
 
               <div className="text-center">

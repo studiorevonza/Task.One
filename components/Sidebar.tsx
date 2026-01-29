@@ -55,9 +55,9 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isOpen, 
       <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-slate-200 text-slate-900 flex flex-col h-full shadow-2xl md:shadow-none transition-transform duration-300 ease-in-out md:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         
         {/* Logo Area */}
-        <div className="p-6 flex justify-between items-center border-b border-slate-100">
-          <div className="flex items-center gap-3">
-            <Logo size="md" />
+        <div className="py-4 px-5 flex justify-between items-center border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <Logo size="xl" />
           </div>
           <button 
             onClick={onClose}
