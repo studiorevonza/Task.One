@@ -58,7 +58,7 @@ app.use(limiter);
 
 // Middleware
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:3000',
+  origin: '*', // Allow all origins during development/troubleshooting
   credentials: true
 }));
 app.use(morgan('combined'));
