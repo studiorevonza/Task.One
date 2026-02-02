@@ -22,7 +22,10 @@ import { Menu, X, Bell } from 'lucide-react';
 import { format, differenceInCalendarDays } from 'date-fns';
 
 // Google OAuth Configuration
-const GOOGLE_CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || '436152930223-2p91794cslr6tqks1nlpekvqig2hn3ch.apps.googleusercontent.com';
+const GOOGLE_CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || 
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? '436152930223-2p91794cslr6tqks1nlpekvqig2hn3ch.apps.googleusercontent.com'  // Local dev client ID
+    : '436152930223-2p91794cslr6tqks1nlpekvqig2hn3ch.apps.googleusercontent.com'); // Production client ID
 
 const App: React.FC = () => {
   // Auth State
@@ -198,7 +201,14 @@ const App: React.FC = () => {
     const interval = setInterval(checkNotifications, 60000);
 
     // Neural Real-time Sync
-    const socket = io('http://localhost:3001');
+    const socket = io({
+      path: '/socket.io',
+      transports: ['websocket', 'polling'],
+      // Use environment-appropriate URL
+      ...(window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? { hostname: 'localhost', port: 3001, protocol: 'ws:' }
+        : { hostname: window.location.hostname, port: window.location.port || undefined })
+    });
     
     socket.on('neural_alert', (data: { message: string, taskTitle?: string }) => {
       console.log('📡 Real-time Neural Alert Received:', data);
