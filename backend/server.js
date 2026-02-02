@@ -76,6 +76,23 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Root endpoint to provide API information
+app.get('/', (req, res) => {
+  res.json({
+    name: 'Task.One API',
+    version: process.env.npm_package_version || '1.0.0',
+    description: 'Neural Task Management API',
+    endpoints: {
+      health: '/api/health',
+      auth: '/api/auth',
+      users: '/api/users',
+      projects: '/api/projects',
+      tasks: '/api/tasks'
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Initialize database connection
 const connectDB = require('./config/db');
 
