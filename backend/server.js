@@ -67,12 +67,23 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
+  const { getDbConnected } = require('./utils/dbHelper');
+  
   res.json({
     status: 'OK',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     environment: process.env.NODE_ENV || 'development',
-    version: process.env.npm_package_version || '1.0.0'
+    version: process.env.npm_package_version || '1.0.0',
+    database: {
+      connected: getDbConnected(),
+      type: process.env.MONGO_LOCAL === "1" ? 'local' : 'atlas'
+    },
+    services: {
+      express: true,
+      socketIO: true,
+      mongodb: getDbConnected()
+    }
   });
 });
 

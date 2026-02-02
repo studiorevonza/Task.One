@@ -15,15 +15,30 @@ const connectDB = async () => {
     
     console.log(`Connection String (masked): ${connStr.replace(/:([^:@]+)@/, ':****@')}`);
     
-    const conn = await mongoose.connect(connStr);
+    // Add connection options for better reliability
+    const options = {
+      serverSelectionTimeoutMS: 5000, // Timeout after 5 seconds
+      socketTimeoutMS: 45000, // Close sockets after 45 seconds of inactivity
+      family: 4, // Use IPv4, skip trying IPv6
+      retryWrites: true,
+      w: 'majority'
+    };
+    
+    const conn = await mongoose.connect(connStr, options);
     
     console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
+    console.log(`📊 Database Name: ${conn.connection.name}`);
     setDbConnected(true); // Set connection status to true
   } catch (error) {
-    console.error(`❌ Error: ${error.message}`);
-    console.error('💡 Tip: For local development, set MONGO_LOCAL=1 in your .env file to use local MongoDB');
+    console.error(`❌ MongoDB Connection Error: ${error.message}`);
+    console.error('📋 Troubleshooting steps:');
+    console.error('  1. Check if MongoDB Atlas cluster is running');
+    console.error('  2. Verify IP whitelist includes 0.0.0.0/0');
+    console.error('  3. Confirm username/password in MONGO_URI');
+    console.error('  4. Check network connectivity');
+    console.error('💡 For local development, set MONGO_LOCAL=1 in .env');
+    
     // Don't exit the process - let the app continue with in-memory storage
-    // process.exit(1);  // COMMENTED OUT - don't crash the app
     setDbConnected(false); // Set connection status to false
   }
 };

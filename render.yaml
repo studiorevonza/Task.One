@@ -1,7 +1,7 @@
 services:
   - name: tasq-one-backend
     type: web
-    env: docker
+    env: node
     region: oregon
     plan: free
     branch: main
@@ -16,24 +16,8 @@ services:
         value: production
       - key: PORT
         value: 10000
-      - key: DB_HOST
-        sync: false
-      - key: DB_PORT
-        value: 3306
-      - key: DB_NAME
-        sync: false
-      - key: DB_USER
-        sync: false
-      - key: DB_PASSWORD
+      - key: MONGO_URI
         sync: false
       - key: JWT_SECRET
         sync: false
     healthCheckPath: /api/health
-
-databases:
-  - name: tasq-one-db
-    databaseName: tasq_one
-    user: mysql
-    plan: free
-    region: oregon
-    ipAllowList: []
