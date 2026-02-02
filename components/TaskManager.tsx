@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Task, TaskStatus, Priority, Category } from '../types';
 // Added Save to the list of imports from lucide-react
 import { Plus, Trash2, Filter, Calendar, AlertTriangle, Link, Lock, X, Flag, Tag, Check, Bell, Clock, Edit2, Search, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Save, Target, FileText, Rocket } from 'lucide-react';
@@ -219,21 +219,69 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, addTask, updateTaskSta
     return `${minutes}m before`;
   };
 
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Neural Stats
+  const stats = useMemo(() => {
+    const total = tasks.length;
+    const completed = tasks.filter(t => t.status === TaskStatus.DONE).length;
+    const overdue = tasks.filter(t => t.status !== TaskStatus.DONE && isPast(new Date(t.dueDate + 'T00:00:00')) && !isToday(new Date(t.dueDate + 'T00:00:00'))).length;
+    const highPriority = tasks.filter(t => t.status !== TaskStatus.DONE && t.priority === Priority.HIGH).length;
+    const efficiency = total > 0 ? Math.round((completed / total) * 100) : 100;
+
+    return { total, completed, overdue, highPriority, efficiency };
+  }, [tasks]);
+
   return (
     <div className="p-4 md:p-8 h-full flex flex-col max-w-7xl mx-auto w-full">
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-8">
-        <div>
-          <h2 className="text-3xl font-black text-slate-900 tracking-tight">My Tasks</h2>
-          <p className="text-slate-500 mt-2 text-sm md:text-base font-medium">Stay organized and track your progress across personal and company categories.</p>
+      {/* Real-time Neural Interface Header */}
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-8 mb-12">
+        <div className="flex-1">
+          <div className="flex items-center gap-3 mb-4">
+             <div className="px-3 py-1 bg-slate-900 text-white rounded-full text-[10px] font-bold uppercase tracking-[0.2em] shadow-lg shadow-slate-200 flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                Task Stream Active
+             </div>
+             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                TEMPO: {format(currentTime, 'HH:mm:ss')} · LIVE SYNC
+             </div>
+          </div>
+          <h2 className="text-4xl md:text-5xl font-bold text-slate-900 tracking-tighter leading-none mb-3">Neural Task Stream</h2>
+          <p className="text-slate-500 text-lg font-medium max-w-2xl">High-precision execution grid managing {stats.total} active units across the workspace.</p>
         </div>
-        <button 
-          onClick={openAddModal}
-          className="w-full md:w-auto bg-slate-900 hover:bg-black text-white px-6 py-3 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-xl shadow-slate-900/10 hover:shadow-slate-900/20 active:scale-95 font-bold"
-        >
-          <Plus size={20} strokeWidth={3} />
-          New Task
-        </button>
+
+        <div className="flex flex-wrap items-center gap-4">
+           {/* Progress Ring / Stat */}
+           <div className="flex items-center gap-6 bg-white p-6 rounded-[2rem] border border-slate-200 shadow-xl shadow-slate-100/50">
+              <div className="flex flex-col">
+                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Efficiency</span>
+                 <span className="text-2xl font-bold text-slate-900">{stats.efficiency}%</span>
+              </div>
+              <div className="h-10 w-px bg-slate-100"></div>
+              <div className="flex flex-col">
+                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Critical</span>
+                 <span className={`text-2xl font-bold ${stats.highPriority > 0 ? 'text-red-500' : 'text-slate-900'}`}>{stats.highPriority} Units</span>
+              </div>
+              <div className="h-10 w-px bg-slate-100"></div>
+              <div className="flex flex-col">
+                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Breach</span>
+                 <span className={`text-2xl font-bold ${stats.overdue > 0 ? 'text-red-500 animate-pulse' : 'text-emerald-500'}`}>{stats.overdue} Expired</span>
+              </div>
+           </div>
+
+           <button 
+              onClick={openAddModal}
+              className="bg-slate-900 hover:bg-black text-white px-8 py-4 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-2xl shadow-slate-900/20 active:scale-95 font-bold uppercase tracking-widest text-xs"
+           >
+              <Plus size={18} strokeWidth={4} />
+              Deploy Task
+           </button>
+        </div>
       </div>
 
       {/* Controls Bar */}
@@ -363,7 +411,7 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, addTask, updateTaskSta
                   <div className="flex-1 min-w-0 pt-0.5">
                      {/* Title & Description */}
                      <div className="mb-4">
-                        <h4 className={`text-lg font-black text-slate-900 leading-tight tracking-tight ${task.status === TaskStatus.DONE ? 'line-through text-slate-300 decoration-slate-200' : ''}`}>
+                        <h4 className={`text-lg font-bold text-slate-900 leading-tight tracking-tight ${task.status === TaskStatus.DONE ? 'line-through text-slate-300 decoration-slate-200' : ''}`}>
                            {task.title}
                         </h4>
                         {task.description && <p className="text-sm text-slate-500 mt-2 line-clamp-2 leading-relaxed font-medium">{task.description}</p>}
@@ -372,35 +420,35 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, addTask, updateTaskSta
                      {/* Distinct Priority & Info Badges */}
                      <div className="flex flex-wrap items-center gap-3">
                         {/* High Contrast Priority Badge */}
-                        <span className={`px-3 py-1 text-[10px] uppercase tracking-[0.1em] font-black rounded-full border shadow-sm flex items-center gap-1.5 ${getPriorityColor(task.priority)}`}>
+                        <span className={`px-3 py-1 text-[10px] uppercase tracking-[0.1em] font-bold rounded-full border shadow-sm flex items-center gap-1.5 ${getPriorityColor(task.priority)}`}>
                            <Flag size={10} fill="currentColor" />
                            {task.priority}
                         </span>
                         
                         {/* Category Badge */}
-                        <span className={`px-3 py-1 text-[10px] uppercase tracking-[0.1em] font-black rounded-full border shadow-sm ${task.category === Category.COMPANY ? 'text-purple-700 bg-purple-50 border-purple-200' : 'text-cyan-700 bg-cyan-50 border-cyan-200'}`}>
+                        <span className={`px-3 py-1 text-[10px] uppercase tracking-[0.1em] font-bold rounded-full border shadow-sm ${task.category === Category.COMPANY ? 'text-purple-700 bg-purple-50 border-purple-200' : 'text-cyan-700 bg-cyan-50 border-cyan-200'}`}>
                            {task.category}
                         </span>
 
                         {task.reminderMinutes && (
-                           <span className="flex items-center gap-1.5 text-[10px] font-black uppercase text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100" title={`Reminder set: ${getReminderLabel(task.reminderMinutes)}`}>
+                           <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100" title={`Reminder set: ${getReminderLabel(task.reminderMinutes)}`}>
                                  <Bell size={10} /> {getReminderLabel(task.reminderMinutes)}
                            </span>
                         )}
                         
                         {isOverdue && (
-                           <span className="flex items-center gap-1.5 text-[10px] font-black uppercase text-red-600 bg-red-50 px-3 py-1 rounded-full border border-red-200 animate-pulse">
+                           <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-red-600 bg-red-50 px-3 py-1 rounded-full border border-red-200 animate-pulse">
                                  <AlertTriangle size={10} /> Overdue
                            </span>
                         )}
                         
                         {isBlocked && (
                            <div className="group/tooltip relative">
-                                 <span className="flex items-center gap-1.5 text-[10px] font-black uppercase text-amber-700 bg-amber-50 px-3 py-1 rounded-full border border-amber-200 cursor-help">
+                                 <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-amber-700 bg-amber-50 px-3 py-1 rounded-full border border-amber-200 cursor-help">
                                     <Lock size={10} /> Blocked
                                  </span>
                                  <div className="absolute bottom-full left-0 mb-3 w-64 p-4 bg-slate-900 text-white text-xs rounded-2xl shadow-2xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all z-20 pointer-events-none border border-slate-800">
-                                    <p className="font-black mb-2 text-slate-400 uppercase tracking-widest text-[9px]">Dependency Block:</p>
+                                    <p className="font-bold mb-2 text-slate-400 uppercase tracking-widest text-[9px]">Dependency Block:</p>
                                     <ul className="space-y-2">
                                        {blockingTasks.map(bt => (
                                           <li key={bt.id} className="flex items-center gap-2">
@@ -417,7 +465,7 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, addTask, updateTaskSta
 
                   {/* Actions & Meta Info */}
                   <div className="flex flex-col items-end gap-4 shrink-0 pl-2">
-                     <div className={`flex items-center gap-2 text-xs font-black uppercase tracking-tight ${dateColorClass}`}>
+                     <div className={`flex items-center gap-2 text-xs font-bold uppercase tracking-tight ${dateColorClass}`}>
                         <Calendar size={14} className="opacity-75" />
                         <span>{formatDateDisplay(task.dueDate, task.dueTime)}</span>
                      </div>
@@ -454,7 +502,7 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, addTask, updateTaskSta
             
             {/* Modal Header */}
             <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/30">
-                <h3 className="text-xl font-black text-slate-900 flex items-center gap-4">
+                <h3 className="text-xl font-bold text-slate-900 flex items-center gap-4">
                 <div className={`p-3 rounded-2xl ${editingTaskId ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'bg-slate-900 text-white shadow-lg shadow-slate-200'}`}>
                     {editingTaskId ? <Edit2 size={24} strokeWidth={3} /> : <Plus size={24} strokeWidth={3} />}
                 </div>
@@ -475,7 +523,7 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, addTask, updateTaskSta
                         <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg shadow-indigo-500/20 mb-4">
                             <Plus className="text-white" size={28} strokeWidth={3} />
                         </div>
-                        <h3 className="text-2xl font-black text-slate-900 mb-1">Create New Task</h3>
+                        <h3 className="text-2xl font-bold text-slate-900 mb-1">Create New Task</h3>
                         <p className="text-slate-500 text-sm font-medium">Define your objectives and organize your workflow</p>
                     </div>
 
@@ -503,7 +551,7 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, addTask, updateTaskSta
                     <div className="space-y-2">
                         <div className="flex items-center gap-2 mb-1">
                             <div className="w-2 h-2 rounded-full bg-orange-500"></div>
-                            <label className="text-xs font-black text-slate-600 uppercase tracking-widest">Strategic Priority</label>
+                            <label className="text-xs font-bold text-slate-600 uppercase tracking-widest">Strategic Priority</label>
                         </div>
                         <div className="grid grid-cols-3 gap-3">
                             {Object.values(Priority).map((priority) => (
@@ -525,7 +573,7 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, addTask, updateTaskSta
                     <div className="space-y-2">
                         <div className="flex items-center gap-2 mb-1">
                             <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                            <label className="text-xs font-black text-slate-600 uppercase tracking-widest">Domain</label>
+                            <label className="text-xs font-bold text-slate-600 uppercase tracking-widest">Domain</label>
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                             {Object.values(Category).map((category) => (
@@ -548,7 +596,7 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, addTask, updateTaskSta
                     <div className="space-y-4">
                         <div className="flex items-center gap-2 mb-1">
                             <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                            <label className="text-xs font-black text-slate-600 uppercase tracking-widest">Timeline Configuration</label>
+                            <label className="text-xs font-bold text-slate-600 uppercase tracking-widest">Timeline Configuration</label>
                         </div>
                         
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -607,7 +655,7 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, addTask, updateTaskSta
                     <div className="space-y-2">
                         <div className="flex items-center gap-2 mb-1">
                             <div className="w-2 h-2 rounded-full bg-purple-500"></div>
-                            <label className="text-xs font-black text-slate-600 uppercase tracking-widest">Contextual Details</label>
+                            <label className="text-xs font-bold text-slate-600 uppercase tracking-widest">Contextual Details</label>
                         </div>
                         <div className="relative">
                             <textarea 
@@ -625,7 +673,7 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, addTask, updateTaskSta
                         <div className="flex items-center justify-between mb-1">
                             <div className="flex items-center gap-2">
                                 <div className="w-2 h-2 rounded-full bg-cyan-500"></div>
-                                <label className="text-xs font-black text-slate-600 uppercase tracking-widest">Dependency Mesh</label>
+                                <label className="text-xs font-bold text-slate-600 uppercase tracking-widest">Dependency Mesh</label>
                             </div>
                             <span className="bg-slate-100 text-slate-500 text-[9px] px-2.5 py-1 rounded-full font-black border border-slate-200">OPTIONAL</span>
                         </div>

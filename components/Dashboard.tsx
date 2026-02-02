@@ -49,7 +49,7 @@ const Dashboard: React.FC<DashboardProps> = ({ tasks, projects, user, onViewChan
     .slice(0, 5);
 
   return (
-    <div className="flex-1 overflow-auto p-4 md:p-6 bg-white">
+    <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-white custom-scrollbar">
       {/* Welcome Section */}
       <div className="mb-8">
         <h1 className="text-2xl md:text-3xl font-bold text-slate-900">

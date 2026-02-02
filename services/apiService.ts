@@ -104,6 +104,20 @@ class ApiService {
     return await this.request('/auth/profile');
   }
 
+  async forgotPassword(email: string) {
+    return await this.request('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email })
+    });
+  }
+
+  async resetPassword(token: string, password: string) {
+    return await this.request('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, password })
+    });
+  }
+
   async getUserProfile(userId) {
     return await this.request(`/users/${userId}/profile`);
   }
@@ -220,6 +234,14 @@ class ApiService {
   // Tags endpoints
   async getTags() {
     return await this.request('/tags');
+  }
+
+  // Notification endpoints
+  async sendEmailNotification(to, subject, body, taskTitle) {
+    return await this.request('/notifications/email', {
+      method: 'POST',
+      body: JSON.stringify({ to, subject, body, taskTitle })
+    });
   }
 
   // Logout

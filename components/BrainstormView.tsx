@@ -256,7 +256,7 @@ const BrainstormView: React.FC<BrainstormViewProps> = ({ tasks, projects, addTas
         </div>
 
         {/* Intelligence Sidebar */}
-        <div className="hidden xl:flex w-96 border-l border-slate-200 bg-white flex-col p-8 overflow-y-auto">
+        <div className="hidden xl:flex w-96 border-l border-slate-200 bg-white flex-col p-8 overflow-y-auto custom-scrollbar">
           <div className="flex items-center justify-between mb-8">
             <h3 className="font-black text-xs uppercase tracking-[0.2em] text-slate-400">Knowledge Base</h3>
             <span className="bg-indigo-50 text-indigo-600 text-[10px] font-black px-2 py-0.5 rounded">Live Sync</span>

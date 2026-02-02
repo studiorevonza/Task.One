@@ -46,8 +46,10 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
 
     try {
       if (mode === 'FORGOT_PASSWORD') {
-        // TODO: Implement forgot password functionality
-        setResetSent(true);
+        const response = await apiService.forgotPassword(email);
+        if (response.success) {
+          setResetSent(true);
+        }
         setLoading(false);
         return;
       }
@@ -59,9 +61,9 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
             id: response.data.user.id.toString(),
             name: response.data.user.name,
             email: response.data.user.email,
-            role: 'Product Designer',
-            avatarUrl: response.data.user.avatar_url || '/logo.svg',
-            joinDate: new Date().toISOString()
+            role: response.data.user.role || 'Product Designer',
+            avatarUrl: response.data.user.avatar_url,
+            joinDate: response.data.user.createdAt
           };
           onLogin(loggedInUser);
         }
@@ -75,9 +77,9 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
             id: response.data.user.id.toString(),
             name: response.data.user.name,
             email: response.data.user.email,
-            role: 'Product Designer',
-            avatarUrl: response.data.user.avatar_url || '/logo.svg',
-            joinDate: new Date().toISOString()
+            role: response.data.user.role || 'Product Designer',
+            avatarUrl: response.data.user.avatar_url,
+            joinDate: response.data.user.createdAt
           };
           onLogin(loggedInUser);
         }
@@ -132,8 +134,8 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
               id: googleResponse.data.user.id.toString(),
               name: googleResponse.data.user.name,
               email: googleResponse.data.user.email,
-              role: 'Product Designer',
-              avatarUrl: googleResponse.data.user.avatar_url || '/logo.svg',
+              role: googleResponse.data.user.role || 'Product Designer',
+              avatarUrl: googleResponse.data.user.avatar_url,
               joinDate: googleResponse.data.user.createdAt
             };
             onLogin(loggedInUser);
@@ -194,75 +196,86 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
     <div className="min-h-screen bg-white flex items-center justify-center p-6">
       <div className="w-full max-w-6xl grid lg:grid-cols-2 gap-20 items-center">
         
-        {/* Left Column - Logo Only */}
+        {/* Left Column - Branding Only */}
         <div className="hidden lg:flex flex-col items-center justify-center space-y-4">
-          <Logo size="xl" />
-          <div className="text-center">
-            <p className="text-slate-600 text-base font-light max-w-xs mt-1">
-              Smart task management for focused productivity
-            </p>
+          <div className="flex items-center">
+             <span className="text-7xl font-black tracking-[0.25em] text-slate-900 font-outfit uppercase">
+               Task
+             </span>
+             <span className="text-7xl font-black text-indigo-600 font-outfit mx-2">.</span>
+             <span className="text-7xl font-light tracking-[0.25em] text-slate-400 font-outfit uppercase">
+               One
+             </span>
+          </div>
+          <div className="text-center pt-8">
+             <p className="text-slate-400 font-medium tracking-[0.4em] uppercase text-xs font-outfit">Organize Everything. Effortlessly.</p>
           </div>
         </div>
 
         {/* Right Column - Authentication Form */}
         <div className="bg-white rounded-lg p-8 w-full max-w-md mx-auto flex flex-col items-center">
           
-          {/* Mobile Header with Logo */}
-          <div className="lg:hidden text-center mb-4">
-            <div className="flex flex-col items-center space-y-2">
-              <Logo size="lg" />
-              
+          {/* Mobile Header with Branding */}
+          <div className="lg:hidden text-center mb-10">
+            <div className="flex items-center justify-center">
+               <span className="text-3xl font-black tracking-[0.15em] text-slate-900 font-outfit uppercase">
+                 Task
+               </span>
+               <span className="text-3xl font-black text-indigo-600 font-outfit mx-1">.</span>
+               <span className="text-3xl font-light tracking-[0.15em] text-slate-400 font-outfit uppercase">
+                 One
+               </span>
             </div>
           </div>
           
           {resetSent ? (
-            <div className="text-center py-8">
-              <div className="w-16 h-16 bg-green-50 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckCircle2 size={32} />
+            <div className="text-center py-10 w-full animate-fade-in">
+              <div className="w-20 h-20 bg-green-50 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner animate-bounce-subtle">
+                <CheckCircle2 size={40} />
               </div>
-              <h3 className="text-xl font-bold text-slate-900 mb-2">Check your email</h3>
-              <p className="text-slate-500 mb-6">We sent a password reset link to <span className="font-semibold text-slate-800">{email}</span></p>
+              <h2 className="text-3xl font-black text-slate-900 mb-4 font-outfit uppercase tracking-tight">Check Mail</h2>
+              <p className="text-slate-500 mb-8 leading-relaxed max-w-[280px] mx-auto">We've sent a secure reset link to <span className="font-bold text-slate-900">{email}</span>. Please check your inbox.</p>
               <button 
                 onClick={() => switchMode('LOGIN')}
-                className="text-slate-900 font-semibold hover:underline"
+                className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-4 rounded-2xl transition-all flex items-center justify-center gap-3 shadow-xl shadow-slate-900/10 transform active:scale-[0.98]"
               >
-                Back to log in
+                Back to Login <ArrowRight size={20} />
               </button>
             </div>
           ) : (
             <>
-              <div className="mb-6 text-center">
-                <h2 className="text-xl font-bold text-slate-900 mb-2">
-                  {mode === 'LOGIN' && 'Welcome back'}
-                  {mode === 'SIGNUP' && 'Create an account'}
-                  {mode === 'FORGOT_PASSWORD' && 'Reset password'}
+              <div className="mb-10 text-center">
+                <h2 className="text-3xl font-black text-slate-900 mb-2 font-outfit uppercase tracking-tight">
+                  {mode === 'LOGIN' && 'Sign In'}
+                  {mode === 'SIGNUP' && 'Join Us'}
+                  {mode === 'FORGOT_PASSWORD' && 'Recover'}
                 </h2>
                 <p className="text-slate-500 text-sm">
                   {mode === 'LOGIN' && 'Enter your credentials to access your workspace.'}
                   {mode === 'SIGNUP' && 'Start organizing your life in seconds.'}
-                  {mode === 'FORGOT_PASSWORD' && 'Enter your email to receive instructions.'}
+                  {mode === 'FORGOT_PASSWORD' && 'Enter your email to receive reset instructions.'}
                 </p>
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-4 w-full max-w-sm">
+              <form onSubmit={handleSubmit} className="space-y-5 w-full max-w-sm">
                 
                 {error && (
-                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center gap-2">
-                    <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                    <span className="text-sm">{error}</span>
+                  <div className="bg-red-50 border border-red-100 text-red-600 px-5 py-4 rounded-2xl flex items-center gap-3 animate-shake">
+                    <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></div>
+                    <span className="text-sm font-medium">{error}</span>
                   </div>
                 )}
                 
                 {mode === 'SIGNUP' && (
                   <div className="space-y-2">
-                    <label className="block text-sm font-medium text-slate-700">Full Name</label>
-                    <div className="relative">
-                      <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Full Name</label>
+                    <div className="relative group">
+                      <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-slate-900 transition-colors" size={20} />
                       <input 
                         type="text" 
                         required 
-                        className="w-full pl-10 pr-4 py-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-slate-900 placeholder-slate-400"
-                        placeholder="Enter your full name"
+                        className="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-slate-900 outline-none transition-all text-slate-900 placeholder-slate-300 font-medium"
+                        placeholder="Your full name"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                       />
@@ -271,13 +284,13 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
                 )}
 
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-slate-700">Email Address</label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Email Address</label>
+                  <div className="relative group">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-slate-900 transition-colors" size={20} />
                     <input 
                       type="email" 
                       required 
-                      className="w-full pl-10 pr-4 py-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-slate-900 placeholder-slate-400"
+                      className="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-slate-900 outline-none transition-all text-slate-900 placeholder-slate-300 font-medium"
                       placeholder="name@company.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
@@ -287,34 +300,34 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
 
                 {mode !== 'FORGOT_PASSWORD' && (
                   <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                       <label className="block text-sm font-medium text-slate-700">Password</label>
+                    <div className="flex justify-between items-center ml-1">
+                       <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest">Password</label>
                        {mode === 'LOGIN' && (
                          <button 
                            type="button" 
                            onClick={() => switchMode('FORGOT_PASSWORD')} 
-                           className="text-sm text-slate-500 hover:text-slate-700"
+                           className="text-xs font-bold text-slate-400 hover:text-slate-900 transition-colors uppercase tracking-widest"
                          >
-                           Forgot password?
+                           Forgot?
                          </button>
                        )}
                     </div>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <div className="relative group">
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-slate-900 transition-colors" size={20} />
                       <input 
                         type={showPassword ? "text" : "password"}
                         required 
-                        className="w-full pl-10 pr-12 py-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-slate-900 placeholder-slate-400"
-                        placeholder="Enter your password"
+                        className="w-full pl-12 pr-12 py-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-slate-900 outline-none transition-all text-slate-900 placeholder-slate-300 font-medium"
+                        placeholder="••••••••"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                       />
                       <button 
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-900 transition-colors"
                       >
-                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                       </button>
                     </div>
                   </div>
@@ -323,24 +336,25 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
                 <button 
                   type="submit" 
                   disabled={loading || !email || (mode !== 'FORGOT_PASSWORD' && !password) || (mode === 'SIGNUP' && !name)}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-lg transition-colors flex items-center justify-center gap-2 mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-4 rounded-2xl transition-all flex items-center justify-center gap-3 mt-6 shadow-xl shadow-slate-900/10 transform active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? (
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <div className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin" />
                   ) : (
                     <>
                       {mode === 'LOGIN' && 'Sign In'}
                       {mode === 'SIGNUP' && 'Create Account'}
-                      {mode === 'FORGOT_PASSWORD' && 'Send Reset Link'}
+                      {mode === 'FORGOT_PASSWORD' && 'Send Link'}
+                      {!loading && <ArrowRight size={20} />}
                     </>
                   )}
                 </button>
 
-                <div className="my-6 relative">
+                <div className="my-10 relative">
                   <div className="relative flex items-center py-3">
-                    <div className="flex-grow border-t border-slate-200"></div>
-                    <span className="flex-shrink mx-4 text-sm text-slate-500 bg-white px-2">or</span>
-                    <div className="flex-grow border-t border-slate-200"></div>
+                    <div className="flex-grow border-t border-slate-100"></div>
+                    <span className="flex-shrink mx-4 text-xs font-bold text-slate-300 uppercase tracking-widest bg-white px-2">or continue with</span>
+                    <div className="flex-grow border-t border-slate-100"></div>
                   </div>
                 </div>
                  
@@ -349,14 +363,14 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
                   type="button"
                   onClick={() => handleGoogleLogin()}
                   disabled={googleLoading}
-                  className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-slate-300 rounded-lg text-slate-700 bg-white hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full flex items-center justify-center gap-3 px-4 py-4 border-2 border-slate-100 rounded-2xl text-slate-700 bg-white hover:bg-slate-50 transition-all font-bold disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                 >
                   {googleLoading ? (
-                    <div className="w-5 h-5 border-2 border-slate-300 border-t-slate-700 rounded-full animate-spin"></div>
+                    <div className="w-5 h-5 border-3 border-slate-300 border-t-slate-700 rounded-full animate-spin"></div>
                   ) : (
-                    <Chrome size={20} className="text-slate-600" />
+                    <Chrome size={20} className="text-slate-900" />
                   )}
-                  <span>{googleLoading ? 'Signing in...' : 'Continue with Google'}</span>
+                  <span>Google Account</span>
                 </button>
               </form>
             </>

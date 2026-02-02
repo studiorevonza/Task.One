@@ -13,26 +13,25 @@ const errorHandler = (err, req, res, next) => {
   let message = err.message || 'Internal Server Error';
   let errors = err.errors || [];
 
-  // Handle specific error types
+  // Handle Mongoose Validation Error
   if (err.name === 'ValidationError') {
     statusCode = 400;
     message = 'Validation Error';
-    errors = Object.values(err.errors).map(e => e.message);
+    errors = Object.values(err.errors).map(val => val.message);
   }
 
-  if (err.code === '23505') { // PostgreSQL unique violation
+  // Handle Mongoose Duplicate Key Error
+  if (err.code === 11000) {
     statusCode = 409;
-    message = 'Resource already exists';
+    const field = Object.keys(err.keyValue)[0];
+    message = `Duplicate value entered for ${field} field`;
+    errors = [`${field} already exists`];
   }
 
-  if (err.code === '23503') { // PostgreSQL foreign key violation
+  // Handle Mongoose Cast Error (Invalid ID)
+  if (err.name === 'CastError') {
     statusCode = 400;
-    message = 'Referenced resource does not exist';
-  }
-
-  if (err.code === '23502') { // PostgreSQL not null violation
-    statusCode = 400;
-    message = 'Required field is missing';
+    message = `Resource not found. Invalid: ${err.path}`;
   }
 
   // Log error in production

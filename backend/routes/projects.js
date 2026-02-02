@@ -1,18 +1,9 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
-
-// Use global database if available, fallback to mock
-const getDb = () => {
-  return global.db || {
-    query: async (sql, params) => {
-      console.warn('⚠️ Database not connected - using in-memory storage');
-      return [];
-    }
-  };
-};
-
-const db = getDb();
+const Project = require('../models/Project');
+const Task = require('../models/Task');
 const { authenticateToken } = require('../middleware/auth');
+const { dbOperation, inMemoryOperations, isDbConnected } = require('../utils/dbHelper');
 
 const router = express.Router();
 
@@ -26,24 +17,61 @@ const projectValidation = [
 // Get all projects for user
 router.get('/', authenticateToken, async (req, res, next) => {
   try {
-    const result = await db.query(`
-      SELECT 
-        p.*,
-        COUNT(t.id) as task_count,
-        COUNT(CASE WHEN t.status = 'completed' THEN 1 END) as completed_tasks
-      FROM projects p
-      LEFT JOIN tasks t ON p.id = t.project_id
-      WHERE p.user_id = ?
-      GROUP BY p.id
-      ORDER BY p.created_at DESC
-    `, [req.user.userId]);
+    let projects;
+    if (isDbConnected()) {
+      // Use database
+      projects = await dbOperation(async () => {
+        return await Project.find({ user: req.user.userId })
+          .sort({ created_at: -1 });
+      }, []);
+    } else {
+      // Use in-memory storage
+      projects = inMemoryOperations.findProjectsByUserId(req.user.userId);
+    }
 
-    res.json({
-      success: true,
-      data: {
-        projects: result
-      }
-    });
+    // If database is not connected, return empty array as fallback
+    if (!projects || projects.length === 0) {
+      return res.json({
+        success: true,
+        data: {
+          projects: []
+        }
+      });
+    }
+
+    // For database results, populate task counts
+    if (isDbConnected()) {
+      // Populate task counts
+      const projectsWithCounts = await Promise.all(projects.map(async (project) => {
+        const taskCount = await dbOperation(async () => {
+          return await Task.countDocuments({ project: project._id });
+        }, 0);
+        
+        const completedCount = await dbOperation(async () => {
+          return await Task.countDocuments({ project: project._id, status: 'completed' });
+        }, 0);
+        
+        const pObj = project.toJSON();
+        pObj.task_count = taskCount;
+        pObj.completed_tasks = completedCount;
+        return pObj;
+      }));
+
+      res.json({
+        success: true,
+        data: {
+          projects: projectsWithCounts
+        }
+      });
+    } else {
+      // For in-memory, return projects as-is
+      res.json({
+        success: true,
+        data: {
+          projects: projects
+        }
+      });
+    }
 
   } catch (error) {
     next(error);
@@ -55,39 +83,64 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    // Get project details
-    const projectResult = await db.query(
-      'SELECT * FROM projects WHERE id = ? AND user_id = ?',
-      [id, req.user.userId]
-    );
+    let project;
+    if (isDbConnected()) {
+      // Use database
+      project = await dbOperation(async () => {
+        return await Project.findOne({ _id: id, user: req.user.userId });
+      });
+    } else {
+      // Use in-memory storage
+      project = inMemoryOperations.findProjectById(id);
+      // Check if it belongs to the current user
+      if (project && project.user !== req.user.userId) {
+        project = null;
+      }
+    }
 
-    if (projectResult.length === 0) {
+    if (!project) {
       return res.status(404).json({
         success: false,
         message: 'Project not found'
       });
     }
 
-    // Get project tasks
-    const tasksResult = await db.query(`
-      SELECT 
-        t.*,
-        u.name as assigned_to_name
-      FROM tasks t
-      LEFT JOIN users u ON t.assigned_to = u.id
-      WHERE t.project_id = ?
-      ORDER BY t.created_at DESC
-    `, [id]);
+    // Get project tasks with assigned user info
+    let tasks = [];
+    if (isDbConnected()) {
+      tasks = await dbOperation(async () => {
+        return await Task.find({ project: id })
+          .populate('assigned_to', 'name')
+          .sort({ created_at: -1 });
+      }, []);
 
-    res.json({
-      success: true,
-      data: {
-        project: {
-          ...projectResult[0],
-          tasks: tasksResult
+      // Transform tasks to include assigned_to_name flat field if needed by frontend
+      const tasksWithFlattenedUser = tasks.map(t => {
+        const tObj = t.toJSON();
+        if (t.assigned_to) {
+          tObj.assigned_to_name = t.assigned_to.name;
         }
-      }
-    });
+        return tObj;
+      });
+
+      res.json({
+        success: true,
+        data: {
+          project: {
+            ...project.toJSON(),
+            tasks: tasksWithFlattenedUser
+          }
+        }
+      });
+    } else {
+      // For in-memory, return project as-is
+      res.json({
+        success: true,
+        data: {
+          project: project
+        }
+      });
+    }
 
   } catch (error) {
     next(error);
@@ -106,25 +159,47 @@ router.post('/', authenticateToken, projectValidation, async (req, res, next) =>
       });
     }
 
-    const { name, description, color } = req.body;
+    const { name, description, color, category, priority, due_date } = req.body;
 
-    const result = await db.query(`
-      INSERT INTO projects (name, description, color, user_id)
-      VALUES (?, ?, ?, ?)
-      
-    `, [name, description || null, color || '#3B82F6', req.user.userId]);
+    let project;
+    if (isDbConnected()) {
+      // Use database
+      project = await dbOperation(async () => {
+        return await Project.create({
+          name,
+          description,
+          color: color || '#3B82F6',
+          category: category || 'company',
+          priority: priority || 'medium',
+          due_date,
+          user: req.user.userId
+        });
+      });
+    } else {
+      // Use in-memory storage
+      project = inMemoryOperations.createProject({
+        name,
+        description,
+        color: color || '#3B82F6',
+        category: category || 'company',
+        priority: priority || 'medium',
+        due_date,
+        user: req.user.userId
+      });
+    }
 
-    // Get the newly created project
-    const newProject = await db.query(
-      'SELECT * FROM projects WHERE id = LAST_INSERT_ID()',
-      []
-    );
+    if (!project) {
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to create project'
+      });
+    }
 
     res.status(201).json({
       success: true,
       message: 'Project created successfully',
       data: {
-        project: newProject[0]
+        project
       }
     });
 
@@ -146,38 +221,47 @@ router.put('/:id', authenticateToken, projectValidation, async (req, res, next) 
     }
 
     const { id } = req.params;
-    const { name, description, color } = req.body;
+    const { name, description, color, category, priority, due_date, progress } = req.body;
 
-    // Check if project exists and belongs to user
-    const existingProject = await db.query(
-      'SELECT id FROM projects WHERE id = ? AND user_id = ?',
-      [id, req.user.userId]
-    );
+    let project;
+    if (isDbConnected()) {
+      // Use database
+      project = await dbOperation(async () => {
+        return await Project.findOneAndUpdate(
+          { _id: id, user: req.user.userId },
+          { 
+            name, 
+            description, 
+            color, 
+            category, 
+            priority, 
+            due_date, 
+            progress 
+          },
+          { new: true, runValidators: true }
+        );
+      });
+    } else {
+      // For in-memory, we'll just return a success response since we can't really update
+      // a project in the in-memory storage without a proper update method
+      return res.status(500).json({
+        success: false,
+        message: 'Project updates require database connection'
+      });
+    }
 
-    if (existingProject.length === 0) {
+    if (!project) {
       return res.status(404).json({
         success: false,
         message: 'Project not found'
       });
     }
 
-    await db.query(`
-      UPDATE projects 
-      SET name = ?, description = ?, color = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ? AND user_id = ?
-    `, [name, description || null, color || '#3B82F6', id, req.user.userId]);
-
-    // Get the updated project
-    const updatedProject = await db.query(
-      'SELECT * FROM projects WHERE id = ?',
-      [id]
-    );
-
     res.json({
       success: true,
       message: 'Project updated successfully',
       data: {
-        project: updatedProject[0]
+        project
       }
     });
 
@@ -191,21 +275,33 @@ router.delete('/:id', authenticateToken, async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    // Check if project exists and belongs to user
-    const existingProject = await db.query(
-      'SELECT id FROM projects WHERE id = ? AND user_id = ?',
-      [id, req.user.userId]
-    );
+    let project;
+    if (isDbConnected()) {
+      // Use database
+      project = await dbOperation(async () => {
+        return await Project.findOneAndDelete({ _id: id, user: req.user.userId });
+      });
+    } else {
+      // For in-memory, we can't delete projects properly
+      return res.status(500).json({
+        success: false,
+        message: 'Project deletion requires database connection'
+      });
+    }
 
-    if (existingProject.length === 0) {
+    if (!project) {
       return res.status(404).json({
         success: false,
         message: 'Project not found'
       });
     }
 
-    // Delete project (tasks will be set to NULL due to CASCADE)
-    await db.query('DELETE FROM projects WHERE id = ? AND user_id = ?', [id, req.user.userId]);
+    // Delete associated tasks
+    if (isDbConnected()) {
+      await dbOperation(async () => {
+        await Task.deleteMany({ project: id });
+      });
+    }
 
     res.json({
       success: true,
@@ -222,37 +318,86 @@ router.get('/:id/stats', authenticateToken, async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    // Verify project ownership
-    const projectCheck = await db.query(
-      'SELECT id FROM projects WHERE id = ? AND user_id = ?',
-      [id, req.user.userId]
-    );
+    // Verify project exists
+    let project;
+    if (isDbConnected()) {
+      project = await dbOperation(async () => {
+        return await Project.findOne({ _id: id, user: req.user.userId });
+      });
+    } else {
+      project = inMemoryOperations.findProjectById(id);
+      // Check if it belongs to the current user
+      if (project && project.user !== req.user.userId) {
+        project = null;
+      }
+    }
 
-    if (projectCheck.length === 0) {
+    if (!project) {
       return res.status(404).json({
         success: false,
         message: 'Project not found'
       });
     }
 
-    const statsResult = await db.query(`
-      SELECT 
-        COUNT(*) as total_tasks,
-        COUNT(CASE WHEN status = 'todo' THEN 1 END) as todo_count,
-        COUNT(CASE WHEN status = 'in_progress' THEN 1 END) as in_progress_count,
-        COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_count,
-        COUNT(CASE WHEN priority = 'high' THEN 1 END) as high_priority_count,
-        COUNT(CASE WHEN due_date < NOW() AND status != 'completed' THEN 1 END) as overdue_count
-      FROM tasks 
-      WHERE project_id = ?
-    `, [id]);
+    // Aggregate stats
+    if (isDbConnected()) {
+      const total_tasks = await dbOperation(async () => {
+        return await Task.countDocuments({ project: id });
+      }, 0);
+      
+      const todo_count = await dbOperation(async () => {
+        return await Task.countDocuments({ project: id, status: 'todo' });
+      }, 0);
+      
+      const in_progress_count = await dbOperation(async () => {
+        return await Task.countDocuments({ project: id, status: 'in_progress' });
+      }, 0);
+      
+      const completed_count = await dbOperation(async () => {
+        return await Task.countDocuments({ project: id, status: 'completed' });
+      }, 0);
+      
+      const high_priority_count = await dbOperation(async () => {
+        return await Task.countDocuments({ project: id, priority: 'high' });
+      }, 0);
+      
+      const overdue_count = await dbOperation(async () => {
+        return await Task.countDocuments({ 
+          project: id, 
+          due_date: { $lt: new Date() }, 
+          status: { $ne: 'completed' } 
+        });
+      }, 0);
 
-    res.json({
-      success: true,
-      data: {
-        stats: statsResult[0]
-      }
-    });
+      res.json({
+        success: true,
+        data: {
+          stats: {
+            total_tasks,
+            todo_count,
+            in_progress_count,
+            completed_count,
+            high_priority_count,
+            overdue_count
+          }
+        }
+      });
+    } else {
+      // For in-memory, return zero stats
+      res.json({
+        success: true,
+        data: {
+          stats: {
+            total_tasks: 0,
+            todo_count: 0,
+            in_progress_count: 0,
+            completed_count: 0,
+            high_priority_count: 0,
+            overdue_count: 0
+          }
+        }
+      });
+    }
 
   } catch (error) {
     next(error);

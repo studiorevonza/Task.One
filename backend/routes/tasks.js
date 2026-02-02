@@ -1,18 +1,10 @@
 const express = require('express');
 const { body, query, validationResult } = require('express-validator');
-
-// Use global database if available, fallback to mock
-const getDb = () => {
-  return global.db || {
-    query: async (sql, params) => {
-      console.warn('⚠️ Database not connected - using in-memory storage');
-      return [];
-    }
-  };
-};
-
-const db = getDb();
+const Task = require('../models/Task');
+const Project = require('../models/Project');
+const User = require('../models/User'); // Imported for populating if needed
 const { authenticateToken } = require('../middleware/auth');
+const { dbOperation, inMemoryOperations, isDbConnected } = require('../utils/dbHelper');
 
 const router = express.Router();
 
@@ -23,8 +15,8 @@ const taskValidation = [
   body('status').optional().isIn(['todo', 'in_progress', 'completed', 'cancelled']).withMessage('Invalid status'),
   body('priority').optional().isIn(['low', 'medium', 'high']).withMessage('Invalid priority'),
   body('due_date').optional().isISO8601().withMessage('Invalid date format'),
-  body('project_id').optional().isInt().withMessage('Project ID must be a number'),
-  body('assigned_to').optional().isInt().withMessage('Assigned to must be a number')
+  body('project_id').optional().isMongoId().withMessage('Project ID must be a valid ID'), // Changed from isInt to isMongoId or generic string check
+  body('assigned_to').optional().isMongoId().withMessage('Assigned to must be a valid ID')
 ];
 
 // Get all tasks for user with filters
@@ -41,107 +33,81 @@ router.get('/', authenticateToken, async (req, res, next) => {
       sort_order = 'desc'
     } = req.query;
 
-    // Build query dynamically
-    let queryText = `
-      SELECT 
-        t.id,
-        t.title,
-        t.description,
-        t.status,
-        t.priority,
-        t.due_date,
-        t.project_id,
-        t.assigned_to,
-        t.created_at,
-        t.updated_at,
-        p.name as project_name,
-        p.color as project_color,
-        u.name as assigned_to_name
-      FROM tasks t
-      LEFT JOIN projects p ON t.project_id = p.id
-      LEFT JOIN users u ON t.assigned_to = u.id
-      WHERE t.user_id = ?
-    `;
-    
-    const queryParams = [req.user.userId];
+    let tasks = [];
+    if (isDbConnected()) {
+      const filter = { user: req.user.userId };
 
-    // Add filters
-    if (status) {
-      queryText += ` AND t.status = ?`;
-      queryParams.push(status);
-    }
-
-    if (priority) {
-      queryText += ` AND t.priority = ?`;
-      queryParams.push(priority);
-    }
-
-    if (project_id) {
-      queryText += ` AND t.project_id = ?`;
-      queryParams.push(parseInt(project_id));
-    }
-
-    if (search) {
-      queryText += ` AND (t.title LIKE ? OR t.description LIKE ?)`;
-      queryParams.push(`%${search}%`, `%${search}%`);
-    }
-
-    // Add sorting
-    const validSortColumns = ['created_at', 'updated_at', 'due_date', 'title', 'priority'];
-    const validSortOrders = ['asc', 'desc'];
-    
-    if (validSortColumns.includes(sort_by) && validSortOrders.includes(sort_order)) {
-      queryText += ` ORDER BY t.${sort_by} ${sort_order.toUpperCase()}`;
-    } else {
-      queryText += ' ORDER BY t.created_at DESC';
-    }
-
-    // Add pagination
-    const offset = (parseInt(page) - 1) * parseInt(limit);
-    queryText += ` LIMIT ? OFFSET ?`;
-    queryParams.push(parseInt(limit), offset);
-
-    const result = await db.query(queryText, queryParams);
-
-    // Get total count for pagination
-    let countQuery = 'SELECT COUNT(*) as count FROM tasks t WHERE t.user_id = ?';
-    const countParams = [req.user.userId];
-
-    if (status) {
-      countQuery += ` AND t.status = ?`;
-      countParams.push(status);
-    }
-
-    if (priority) {
-      countQuery += ` AND t.priority = ?`;
-      countParams.push(priority);
-    }
-
-    if (project_id) {
-      countQuery += ` AND t.project_id = ?`;
-      countParams.push(parseInt(project_id));
-    }
-
-    if (search) {
-      countQuery += ` AND (t.title LIKE ? OR t.description LIKE ?)`;
-      countParams.push(`%${search}%`, `%${search}%`);
-    }
-
-    const countResult = await db.query(countQuery, countParams);
-    const total = parseInt(countResult[0].count);
-
-    res.json({
-      success: true,
-      data: {
-        tasks: result,
-        pagination: {
-          currentPage: parseInt(page),
-          totalPages: Math.ceil(total / parseInt(limit)),
-          totalItems: total,
-          itemsPerPage: parseInt(limit)
-        }
+      if (status) filter.status = status;
+      if (priority) filter.priority = priority;
+      if (project_id) filter.project = project_id;
+      
+      if (search) {
+        filter.$or = [
+          { title: { $regex: search, $options: 'i' } },
+          { description: { $regex: search, $options: 'i' } }
+        ];
       }
-    });
+
+      const sortOption = {};
+      if (sort_by) {
+        sortOption[sort_by] = sort_order === 'asc' ? 1 : -1;
+      } else {
+        sortOption.created_at = -1;
+      }
+
+      tasks = await dbOperation(async () => {
+        return await Task.find(filter)
+          .populate('project', 'name color')
+          .populate('assigned_to', 'name')
+          .sort(sortOption)
+          .skip((page - 1) * limit)
+          .limit(parseInt(limit));
+      }, []);
+
+      const total = await dbOperation(async () => {
+        return await Task.countDocuments(filter);
+      }, 0);
+
+      // Transform for frontend format expectations (flattening)
+      const formattedTasks = tasks.map(t => {
+        const obj = t.toJSON();
+        if (t.project) {
+          obj.project_name = t.project.name;
+          obj.project_color = t.project.color;
+        }
+        if (t.assigned_to) {
+          obj.assigned_to_name = t.assigned_to.name;
+        }
+        return obj;
+      });
+
+      res.json({
+        success: true,
+        data: {
+          tasks: formattedTasks,
+          pagination: {
+            currentPage: parseInt(page),
+            totalPages: Math.ceil(total / parseInt(limit)),
+            totalItems: total,
+            itemsPerPage: parseInt(limit)
+          }
+        }
+      });
+    } else {
+      // For in-memory, return empty tasks
+      res.json({
+        success: true,
+        data: {
+          tasks: [],
+          pagination: {
+            currentPage: parseInt(page),
+            totalPages: 0,
+            totalItems: 0,
+            itemsPerPage: parseInt(limit)
+          }
+        }
+      });
+    }
 
   } catch (error) {
     next(error);
@@ -153,33 +119,46 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    const result = await db.query(`
-      SELECT 
-        t.*,
-        p.name as project_name,
-        p.color as project_color,
-        u.name as assigned_to_name,
-        creator.name as creator_name
-      FROM tasks t
-      LEFT JOIN projects p ON t.project_id = p.id
-      LEFT JOIN users u ON t.assigned_to = u.id
-      LEFT JOIN users creator ON t.user_id = creator.id
-      WHERE t.id = ? AND t.user_id = ?
-    `, [id, req.user.userId]);
+    if (isDbConnected()) {
+      const task = await dbOperation(async () => {
+        return await Task.findOne({ _id: id, user: req.user.userId })
+          .populate('project', 'name color')
+          .populate('assigned_to', 'name')
+          .populate('user', 'name'); // Creator
+      });
 
-    if (result.length === 0) {
+      if (!task) {
+        return res.status(404).json({
+          success: false,
+          message: 'Task not found'
+        });
+      }
+
+      const taskObj = task.toJSON();
+      if (task.project) {
+        taskObj.project_name = task.project.name;
+        taskObj.project_color = task.project.color;
+      }
+      if (task.assigned_to) {
+        taskObj.assigned_to_name = task.assigned_to.name;
+      }
+      if (task.user) {
+        taskObj.creator_name = task.user.name;
+      }
+
+      res.json({
+        success: true,
+        data: {
+          task: taskObj
+        }
+      });
+    } else {
+      // For in-memory, return not found
       return res.status(404).json({
         success: false,
         message: 'Task not found'
       });
     }
-
-    res.json({
-      success: true,
-      data: {
-        task: result[0]
-      }
-    });
 
   } catch (error) {
     next(error);
@@ -200,35 +179,64 @@ router.post('/', authenticateToken, taskValidation, async (req, res, next) => {
 
     const { title, description, status, priority, due_date, project_id, assigned_to } = req.body;
 
-    await db.query(`
-      INSERT INTO tasks 
-      (title, description, status, priority, due_date, project_id, user_id, assigned_to)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      
-    `, [
-      title,
-      description || null,
-      status || 'todo',
-      priority || 'medium',
-      due_date ? new Date(due_date) : null,
-      project_id || null,
-      req.user.userId,
-      assigned_to || null
-    ]);
+    if (isDbConnected()) {
+      const task = await dbOperation(async () => {
+        return await Task.create({
+          title,
+          description,
+          status: status || 'todo',
+          priority: priority || 'medium',
+          due_date,
+          project: project_id || null,
+          user: req.user.userId,
+          assigned_to: assigned_to || null
+        });
+      });
 
-    // Get the newly created task
-    const newTask = await db.query(
-      'SELECT t.*, p.name as project_name, p.color as project_color, u.name as assigned_to_name FROM tasks t LEFT JOIN projects p ON t.project_id = p.id LEFT JOIN users u ON t.assigned_to = u.id WHERE t.id = LAST_INSERT_ID()',
-      []
-    );
-
-    res.status(201).json({
-      success: true,
-      message: 'Task created successfully',
-      data: {
-        task: newTask[0]
+      if (!task) {
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to create task'
+        });
       }
-    });
+
+      const populatedTask = await dbOperation(async () => {
+        return await Task.findById(task._id)
+          .populate('project', 'name color')
+          .populate('assigned_to', 'name');
+      });
+
+      // Emit Real-time signal
+      if (req.app.get('io')) {
+        req.app.get('io').emit('neural_alert', {
+          message: `System Alert: New Operational Unit initialized: "${title}"`,
+          taskTitle: title
+        });
+      }
+
+      const taskObj = populatedTask.toJSON();
+      if (populatedTask.project) {
+        taskObj.project_name = populatedTask.project.name;
+        taskObj.project_color = populatedTask.project.color;
+      }
+      if (populatedTask.assigned_to) {
+        taskObj.assigned_to_name = populatedTask.assigned_to.name;
+      }
+
+      res.status(201).json({
+        success: true,
+        message: 'Task created successfully',
+        data: {
+          task: taskObj
+        }
+      });
+    } else {
+      // For in-memory, return error since we can't create tasks without DB
+      return res.status(500).json({
+        success: false,
+        message: 'Task creation requires database connection'
+      });
+    }
 
   } catch (error) {
     next(error);
@@ -250,49 +258,63 @@ router.put('/:id', authenticateToken, taskValidation, async (req, res, next) => 
     const { id } = req.params;
     const { title, description, status, priority, due_date, project_id, assigned_to } = req.body;
 
-    // Check if task exists and belongs to user
-    const existingTask = await db.query(
-      'SELECT id FROM tasks WHERE id = ? AND user_id = ?',
-      [id, req.user.userId]
-    );
+    if (isDbConnected()) {
+      const task = await dbOperation(async () => {
+        return await Task.findOneAndUpdate(
+          { _id: id, user: req.user.userId },
+          { 
+            title, 
+            description, 
+            status, 
+            priority, 
+            due_date, 
+            project: project_id || null, 
+            assigned_to: assigned_to || null 
+          },
+          { new: true, runValidators: true }
+        )
+        .populate('project', 'name color')
+        .populate('assigned_to', 'name');
+      });
 
-    if (existingTask.length === 0) {
-      return res.status(404).json({
+      if (!task) {
+        return res.status(404).json({
+          success: false,
+          message: 'Task not found'
+        });
+      }
+
+      // Emit Real-time signal
+      if (req.app.get('io')) {
+        req.app.get('io').emit('neural_alert', {
+          message: `System Alert: Operational Unit "${title}" has been updated.`,
+          taskTitle: title
+        });
+      }
+
+      const taskObj = task.toJSON();
+      if (task.project) {
+        taskObj.project_name = task.project.name;
+        taskObj.project_color = task.project.color;
+      }
+      if (task.assigned_to) {
+        taskObj.assigned_to_name = task.assigned_to.name;
+      }
+
+      res.json({
+        success: true,
+        message: 'Task updated successfully',
+        data: {
+          task: taskObj
+        }
+      });
+    } else {
+      // For in-memory, return error since we can't update tasks without DB
+      return res.status(500).json({
         success: false,
-        message: 'Task not found'
+        message: 'Task updates require database connection'
       });
     }
-
-    await db.query(`
-      UPDATE tasks 
-      SET title = ?, description = ?, status = ?, priority = ?, 
-          due_date = ?, project_id = ?, assigned_to = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ? AND user_id = ?
-    `, [
-      title,
-      description || null,
-      status || 'todo',
-      priority || 'medium',
-      due_date ? new Date(due_date) : null,
-      project_id || null,
-      assigned_to || null,
-      id,
-      req.user.userId
-    ]);
-
-    // Get the updated task
-    const updatedTask = await db.query(
-      'SELECT t.*, p.name as project_name, p.color as project_color, u.name as assigned_to_name FROM tasks t LEFT JOIN projects p ON t.project_id = p.id LEFT JOIN users u ON t.assigned_to = u.id WHERE t.id = ?',
-      [id]
-    );
-
-    res.json({
-      success: true,
-      message: 'Task updated successfully',
-      data: {
-        task: updatedTask[0]
-      }
-    });
 
   } catch (error) {
     next(error);
@@ -304,25 +326,29 @@ router.delete('/:id', authenticateToken, async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    // Check if task exists and belongs to user
-    const existingTask = await db.query(
-      'SELECT id FROM tasks WHERE id = ? AND user_id = ?',
-      [id, req.user.userId]
-    );
+    if (isDbConnected()) {
+      const task = await dbOperation(async () => {
+        return await Task.findOneAndDelete({ _id: id, user: req.user.userId });
+      });
 
-    if (existingTask.length === 0) {
-      return res.status(404).json({
+      if (!task) {
+        return res.status(404).json({
+          success: false,
+          message: 'Task not found'
+        });
+      }
+
+      res.json({
+        success: true,
+        message: 'Task deleted successfully'
+      });
+    } else {
+      // For in-memory, return error since we can't delete tasks without DB
+      return res.status(500).json({
         success: false,
-        message: 'Task not found'
+        message: 'Task deletion requires database connection'
       });
     }
-
-    await db.query('DELETE FROM tasks WHERE id = ? AND user_id = ?', [id, req.user.userId]);
-
-    res.json({
-      success: true,
-      message: 'Task deleted successfully'
-    });
 
   } catch (error) {
     next(error);
@@ -332,25 +358,66 @@ router.delete('/:id', authenticateToken, async (req, res, next) => {
 // Get task statistics
 router.get('/stats/overview', authenticateToken, async (req, res, next) => {
   try {
-    const result = await db.query(`
-      SELECT 
-        COUNT(*) as total_tasks,
-        COUNT(CASE WHEN status = 'todo' THEN 1 END) as todo_count,
-        COUNT(CASE WHEN status = 'in_progress' THEN 1 END) as in_progress_count,
-        COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_count,
-        COUNT(CASE WHEN status = 'cancelled' THEN 1 END) as cancelled_count,
-        COUNT(CASE WHEN priority = 'high' THEN 1 END) as high_priority_count,
-        COUNT(CASE WHEN due_date < NOW() AND status != 'completed' THEN 1 END) as overdue_count
-      FROM tasks 
-      WHERE user_id = ?
-    `, [req.user.userId]);
+    const userId = req.user.userId;
 
-    res.json({
-      success: true,
-      data: {
-        stats: result[0]
-      }
-    });
+    if (isDbConnected()) {
+      const total_tasks = await dbOperation(async () => {
+        return await Task.countDocuments({ user: userId });
+      }, 0);
+      const todo_count = await dbOperation(async () => {
+        return await Task.countDocuments({ user: userId, status: 'todo' });
+      }, 0);
+      const in_progress_count = await dbOperation(async () => {
+        return await Task.countDocuments({ user: userId, status: 'in_progress' });
+      }, 0);
+      const completed_count = await dbOperation(async () => {
+        return await Task.countDocuments({ user: userId, status: 'completed' });
+      }, 0);
+      const cancelled_count = await dbOperation(async () => {
+        return await Task.countDocuments({ user: userId, status: 'cancelled' });
+      }, 0);
+      const high_priority_count = await dbOperation(async () => {
+        return await Task.countDocuments({ user: userId, priority: 'high' });
+      }, 0);
+      const overdue_count = await dbOperation(async () => {
+        return await Task.countDocuments({ 
+          user: userId, 
+          due_date: { $lt: new Date() }, 
+          status: { $ne: 'completed' } 
+        });
+      }, 0);
+
+      res.json({
+        success: true,
+        data: {
+          stats: {
+            total_tasks,
+            todo_count,
+            in_progress_count,
+            completed_count,
+            cancelled_count,
+            high_priority_count,
+            overdue_count
+          }
+        }
+      });
+    } else {
+      // For in-memory, return zero stats
+      res.json({
+        success: true,
+        data: {
+          stats: {
+            total_tasks: 0,
+            todo_count: 0,
+            in_progress_count: 0,
+            completed_count: 0,
+            cancelled_count: 0,
+            high_priority_count: 0,
+            overdue_count: 0
+          }
+        }
+      });
+    }
 
   } catch (error) {
     next(error);

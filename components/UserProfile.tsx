@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { User, Task, TaskStatus } from '../types';
-import { Mail, Briefcase, LogOut, Shield, Bell, Edit3, MapPin, Link as LinkIcon, CheckCircle2, Clock, Activity, Save, X, Check, Loader2, User as UserIcon, Calendar, Award, TrendingUp, Zap, Crown, Settings, Camera, Upload, Eye, EyeOff, Key, Fingerprint, Wifi, Cloud, Database, BarChart3, Target, Star, Globe, Hash, CalendarClock } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import React, { useState, useEffect, useMemo } from 'react';
+import { User, Task, TaskStatus, Project } from '../types';
+import { Mail, Briefcase, LogOut, Shield, Bell, Edit3, MapPin, Link as LinkIcon, CheckCircle2, Clock, Activity, Save, X, Check, Loader2, User as UserIcon, Calendar, Award, TrendingUp, Zap, Crown, Settings, Camera, Upload, Eye, EyeOff, Key, Fingerprint, Wifi, Cloud, Database, BarChart3, Target, Star, Globe, Hash, CalendarClock, Monitor, Smartphone, Cpu, Laptop } from 'lucide-react';
+import { format, parseISO, isSameDay, subDays, startOfDay } from 'date-fns';
 import apiService from '../services/apiService';
 
 interface UserProfileProps {
   user: User;
   tasks: Task[];
+  projects: Project[];
   onLogout: () => void;
   onUpdateUser: (updates: Partial<User>) => void;
 }
@@ -41,12 +42,19 @@ interface SubscriptionPlan {
   };
 }
 
-const UserProfile: React.FC<UserProfileProps> = ({ user, tasks, onLogout, onUpdateUser }) => {
+const UserProfile: React.FC<UserProfileProps> = ({ user, tasks, projects, onLogout, onUpdateUser }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [toast, setToast] = useState<{message: string, type: 'success' | 'error' | 'info'} | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [currentTime, setCurrentTime] = useState(new Date());
   
+  // Real-time clock
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   // Security settings
   const [securitySettings, setSecuritySettings] = useState<SecuritySettings>({
     twoFactorEnabled: true,
@@ -86,149 +94,126 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, tasks, onLogout, onUpda
     avatar: ''
   });
 
-  // Analytics data
-  const [analytics, setAnalytics] = useState({
-    completionRate: 0,
-    tasksCompleted: 0,
-    tasksPending: 0,
-    streak: 12,
-    productivityScore: 87
-  });
-
-  // Load user data on mount
-  useEffect(() => {
-    loadUserData();
-    
-    // Also load analytics from tasks
-    const completed = tasks.filter(t => t.status === TaskStatus.DONE).length;
-    const pending = tasks.filter(t => t.status !== TaskStatus.DONE).length;
+  // Real-time Analytics Calculations
+  const analytics = useMemo(() => {
+    const completedTasksList = tasks.filter(t => t.status === TaskStatus.DONE);
+    const completed = completedTasksList.length;
+    const pending = tasks.length - completed;
     const rate = tasks.length > 0 ? Math.round((completed / tasks.length) * 100) : 0;
     
-    setAnalytics({
+    // Matrix data for last 28 days
+    const matrix = Array.from({ length: 28 }).map((_, i) => {
+      const date = subDays(startOfDay(new Date()), i);
+      const count = completedTasksList.filter(t => {
+        try {
+          return isSameDay(parseISO(t.dueDate), date);
+        } catch {
+          return false;
+        }
+      }).length;
+      return { date, count };
+    }).reverse();
+
+    // Project saturation
+    const projectStats = projects.map(p => {
+      const projectTasks = tasks.filter(t => t.projectId === p.id);
+      const saturation = tasks.length > 0 ? (projectTasks.length / tasks.length) * 100 : 0;
+      return { name: p.name, saturation, count: projectTasks.length };
+    }).sort((a,b) => b.saturation - a.saturation).slice(0, 4);
+
+    return {
       completionRate: rate,
       tasksCompleted: completed,
       tasksPending: pending,
-      streak: 12, // This would come from API in real implementation
-      productivityScore: 87 // This would come from API in real implementation
-    });
-  }, [user.id, tasks]);
+      matrix,
+      projectStats
+    };
+  }, [tasks, projects]);
 
   const loadUserData = async () => {
     try {
-      // Try to load profile data from API
-      const profileData = await apiService.getProfile();
-      if (profileData) {
-        setFormData(prev => ({
-          ...prev,
-          ...profileData
-        }));
+      const response = await apiService.getProfile();
+      if (response.success && response.data.user) {
+        const u = response.data.user;
+        const currentData = {
+          name: u.name || '',
+          role: u.role || 'Product Designer',
+          location: u.location || '',
+          bio: u.bio || 'Product Designer passionate about creating exceptional digital experiences',
+          website: u.website || `tasq.one/u/${u.id}`,
+          avatar: u.avatar_url || ''
+        };
+        setFormData(currentData);
+        
+        setSecuritySettings({
+          twoFactorEnabled: !!u.twoFactorEnabled,
+          biometricEnabled: !!u.twoFactorEnabled,
+          notificationsEnabled: !!u.notificationsEnabled,
+          emailNotifications: !!u.notificationsEnabled,
+          smsNotifications: false,
+          pushNotifications: !!u.notificationsEnabled
+        });
+
+        // Trigger real-time location detection if location is empty or default
+        if (!u.location || u.location === 'San Francisco, CA') {
+          detectLocation();
+        }
       }
-      
-      // Try to load from localStorage as fallback
-      const localProfile = localStorage.getItem(`user_${user.id}_profile`);
-      if (localProfile) {
-        const localData = JSON.parse(localProfile);
-        setFormData(prev => ({
-          ...prev,
-          ...localData
-        }));
-      }
-      
-      // Load security settings from localStorage
-      const localSecurity = localStorage.getItem(`user_${user.id}_security`);
-      if (localSecurity) {
-        const securityData = JSON.parse(localSecurity);
-        setSecuritySettings(securityData);
-      }
-      
     } catch (error) {
-      console.log('Using default/fallback data');
-      
-      // Load any existing local data
-      const localProfile = localStorage.getItem(`user_${user.id}_profile`);
-      if (localProfile) {
-        const localData = JSON.parse(localProfile);
-        setFormData(prev => ({
-          ...prev,
-          ...localData
-        }));
-      }
-      
-      const localSecurity = localStorage.getItem(`user_${user.id}_security`);
-      if (localSecurity) {
-        const securityData = JSON.parse(localSecurity);
-        setSecuritySettings(securityData);
-      }
+      console.log('Error loading user data from API');
     }
   };
 
-  const completedTasks = analytics.tasksCompleted || tasks.filter(t => t.status === TaskStatus.DONE).length;
-  const pendingTasks = analytics.tasksPending || tasks.filter(t => t.status !== TaskStatus.DONE).length;
-  const completionRate = analytics.completionRate || (tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0);
+  const detectLocation = async () => {
+    try {
+      const locResponse = await fetch('https://ipapi.co/json/');
+      const locData = await locResponse.json();
+      if (locData.city && locData.country_name) {
+        const detectedLocation = `${locData.city}, ${locData.country_name}`;
+        setFormData(prev => ({ ...prev, location: detectedLocation }));
+        // Sync with backend
+        apiService.updateProfile({ location: detectedLocation });
+      }
+    } catch (err) {
+      console.log('Location auto-detect suspended (Privacy/Network)');
+    }
+  };
+
+  useEffect(() => {
+    loadUserData();
+  }, [user.id]);
 
   const handleInputChange = (field: keyof ProfileFormData, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setAvatarPreview(reader.result as string);
-        setFormData(prev => ({
-          ...prev,
-          avatar: reader.result as string
-        }));
-      };
-      reader.readAsDataURL(file);
-    }
+    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      // Try to save to API first
-      await apiService.updateProfile(formData);
-      
-      // Update local user state
-      onUpdateUser({
+      const updateData = {
         name: formData.name,
         role: formData.role,
-      });
+        location: formData.location,
+        bio: formData.bio,
+        website: formData.website,
+        avatar_url: formData.avatar
+      };
+
+      const response = await apiService.updateProfile(updateData);
       
-      setIsSaving(false);
-      setIsEditing(false);
-      showToast({message: 'Profile updated successfully', type: 'success'});
-    } catch (error) {
-      // Fallback to localStorage if API fails
-      try {
-        const userData = {
-          ...user,
-          name: formData.name,
-          role: formData.role,
-          ...formData
-        };
-        
-        // Save to localStorage as backup
-        localStorage.setItem(`user_${user.id}_profile`, JSON.stringify(userData));
-        
-        // Update local user state
+      if (response.success) {
         onUpdateUser({
           name: formData.name,
           role: formData.role,
+          avatarUrl: formData.avatar
         });
-        
         setIsSaving(false);
         setIsEditing(false);
-        showToast({message: 'Profile saved locally (offline mode)', type: 'info'});
-      } catch (fallbackError) {
-        setIsSaving(false);
-        showToast({message: 'Failed to update profile', type: 'error'});
+        showToast({message: 'Profile updated successfully', type: 'success'});
       }
+    } catch (error) {
+      setIsSaving(false);
+      showToast({message: 'Failed to update profile', type: 'error'});
     }
   };
 
@@ -242,7 +227,6 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, tasks, onLogout, onUpda
       const newValue = !prev[setting];
       const newSettings = {...prev, [setting]: newValue};
       
-      // Try to save to API
       apiService.updateProfile({security: newSettings})
         .then(() => {
           showToast({
@@ -251,39 +235,32 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, tasks, onLogout, onUpda
           });
         })
         .catch(() => {
-          // Fallback to localStorage
-          localStorage.setItem(`user_${user.id}_security`, JSON.stringify(newSettings));
-          showToast({
-            message: `${setting.replace(/([A-Z])/g, ' $1')} ${newValue ? 'enabled locally' : 'disabled locally'}`, 
-            type: 'info'
-          });
+          showToast({ message: 'Sync failed', type: 'error' });
         });
       
       return newSettings;
     });
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active': return 'bg-emerald-500';
-      case 'trial': return 'bg-amber-500';
-      case 'expired': return 'bg-red-500';
-      default: return 'bg-slate-500';
-    }
+  const getSystemInfo = () => {
+    const ua = navigator.userAgent;
+    let browser = "Unknown Browser";
+    if (ua.includes("Chrome")) browser = "Chrome Kernel";
+    else if (ua.includes("Firefox")) browser = "Firefox Client";
+    else if (ua.includes("Safari")) browser = "Safari Engine";
+    
+    let platform = "Desktop Instance";
+    if (ua.includes("Windows")) platform = "Windows Node";
+    else if (ua.includes("Mac")) platform = "MacOS Node";
+    else if (ua.includes("Linux")) platform = "Linux Node";
+    
+    return { browser, platform };
   };
 
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'active': return 'Active';
-      case 'trial': return 'Trial';
-      case 'expired': return 'Expired';
-      default: return 'Unknown';
-    }
-  };
+  const { browser, platform } = getSystemInfo();
 
   return (
-    <div className="flex-1 h-full overflow-y-auto bg-gradient-to-br from-slate-50 via-white to-slate-50">
-      {/* Toast Notification */}
+    <div className="flex-1 h-full overflow-y-auto bg-gradient-to-br from-slate-50 via-white to-slate-50 custom-scrollbar">
       {toast && (
         <div className="fixed top-6 right-6 z-[60] animate-fade-in-up">
            <div className={`px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 font-bold text-sm ${
@@ -291,9 +268,9 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, tasks, onLogout, onUpda
              toast.type === 'error' ? 'bg-red-500 text-white' :
              'bg-slate-900 text-white'
            }`}>
-              {toast.type === 'success' && <CheckCircle2 size={18} className="text-white" />}
-              {toast.type === 'error' && <X size={18} className="text-white" />}
-              {toast.type === 'info' && <Bell size={18} className="text-white" />}
+              {toast.type === 'success' && <CheckCircle2 size={18} />}
+              {toast.type === 'error' && <X size={18} />}
+              {toast.type === 'info' && <Bell size={18} />}
               {toast.message}
            </div>
         </div>
@@ -302,57 +279,38 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, tasks, onLogout, onUpda
       <div className="max-w-5xl mx-auto px-4 md:px-8 py-10 space-y-8 pb-24">
         
         {/* Profile Header Card */}
-        <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 p-8 md:p-12 relative overflow-hidden group">
-           <div className="absolute -right-20 -top-20 w-64 h-64 bg-slate-50 rounded-full group-hover:scale-110 transition-transform duration-700 pointer-events-none"></div>
-           
+        <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 p-8 md:p-12 relative overflow-hidden">
            <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
-              
               <div className="flex flex-col md:flex-row items-center gap-8 text-center md:text-left">
-                 {/* Avatar with upload capability */}
-                 <div className="relative group">
-                   <div className="w-24 h-24 rounded-[2rem] bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center text-4xl font-black shadow-xl shadow-indigo-500/20 relative overflow-hidden">
-                     {avatarPreview ? (
-                       <img src={avatarPreview} alt="Profile" className="w-full h-full object-cover" />
-                     ) : formData.avatar ? (
-                       <img src={formData.avatar} alt="Profile" className="w-full h-full object-cover" />
-                     ) : (
-                       formData.name.charAt(0)
-                     )}
-                     {isEditing && (
-                       <label className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded-[2rem]">
-                         <Camera size={24} className="text-white" />
-                         <input 
-                           type="file" 
-                           accept="image/*" 
-                           className="hidden" 
-                           onChange={handleAvatarUpload}
-                         />
-                       </label>
-                     )}
-                   </div>
-                 </div>
-                 
                  <div>
+                    <div className="flex items-center justify-center md:justify-start gap-4 mb-2">
+                      <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full border border-emerald-100 animate-pulse">
+                        <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.8)]"></div>
+                        <span className="text-[10px] font-bold uppercase tracking-widest">Active Now</span>
+                      </div>
+                      <span className="text-slate-300 font-semibold text-xs uppercase tracking-[0.2em]">{format(currentTime, 'HH:mm:ss')}</span>
+                    </div>
+
                     {isEditing ? (
                       <div className="space-y-3">
                          <input 
                            type="text" 
-                           className="text-3xl font-black text-slate-900 bg-slate-50 border-b-2 border-slate-200 outline-none focus:border-indigo-600 transition-colors py-1 w-full"
+                           className="text-3xl font-black text-slate-900 bg-slate-50 border-b-2 border-slate-200 outline-none focus:border-indigo-600 py-1 w-full"
                            value={formData.name}
                            onChange={(e) => handleInputChange('name', e.target.value)}
                            autoFocus
                          />
                          <input 
                            type="text" 
-                           className="text-lg font-bold text-slate-500 bg-slate-50 border-b-2 border-slate-100 outline-none focus:border-indigo-600 transition-colors py-1 w-full"
+                           className="text-lg font-bold text-slate-500 bg-slate-50 border-b-2 border-slate-100 outline-none focus:border-indigo-600 py-1 w-full"
                            value={formData.role}
                            onChange={(e) => handleInputChange('role', e.target.value)}
                          />
                       </div>
                     ) : (
                       <>
-                        <h1 className="text-4xl font-black text-slate-900 tracking-tight">{formData.name}</h1>
-                        <p className="text-slate-500 font-bold flex items-center justify-center md:justify-start gap-2 mt-2 uppercase tracking-widest text-xs">
+                        <h1 className="text-4xl font-bold text-slate-900 tracking-tight">{formData.name}</h1>
+                        <p className="text-slate-500 font-semibold flex items-center justify-center md:justify-start gap-2 mt-2 uppercase tracking-widest text-xs">
                            <Briefcase size={16} className="text-indigo-500" />
                            {formData.role}
                         </p>
@@ -368,36 +326,21 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, tasks, onLogout, onUpda
               <div className="flex items-center gap-3">
                  {isEditing ? (
                    <>
-                     <button 
-                       onClick={() => setIsEditing(false)}
-                       className="px-6 py-3 bg-white border border-slate-200 text-slate-600 font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-slate-50 transition-all active:scale-95"
-                     >
+                     <button onClick={() => setIsEditing(false)} className="px-6 py-3 bg-white border border-slate-200 text-slate-600 font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-slate-50 transition-all active:scale-95">
                         Cancel
                      </button>
-                     <button 
-                       onClick={handleSave}
-                       disabled={isSaving}
-                       className="px-6 py-3 bg-indigo-600 text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex items-center gap-2 active:scale-95 disabled:opacity-50"
-                     >
+                     <button onClick={handleSave} disabled={isSaving} className="px-6 py-3 bg-indigo-600 text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-indigo-700 shadow-lg shadow-indigo-100 flex items-center gap-2 active:scale-95 disabled:opacity-50">
                         {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                        Save Profile
+                        Save Changes
                      </button>
                    </>
                  ) : (
                    <>
-                     <button 
-                       onClick={() => setIsEditing(true)}
-                       className="px-6 py-3 bg-white border border-slate-200 text-slate-700 font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-slate-50 transition-all flex items-center gap-2 shadow-sm active:scale-95"
-                     >
-                        <Edit3 size={16} />
-                        Edit Profile
+                     <button onClick={() => setIsEditing(true)} className="px-6 py-3 bg-white border border-slate-200 text-slate-700 font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-slate-50 flex items-center gap-2 shadow-sm active:scale-95">
+                        <Edit3 size={16} /> Edit Profile
                      </button>
-                     <button 
-                       onClick={onLogout}
-                       className="px-6 py-3 bg-red-50 border border-red-100 text-red-600 font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-red-100 transition-all flex items-center gap-2 shadow-sm active:scale-95"
-                     >
-                        <LogOut size={16} />
-                        Logout
+                     <button onClick={onLogout} className="px-6 py-3 bg-red-50 border border-red-100 text-red-600 font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-red-100 transition-all flex items-center gap-2 shadow-sm active:scale-95">
+                        <LogOut size={16} /> Logout
                      </button>
                    </>
                  )}
@@ -405,146 +348,149 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, tasks, onLogout, onUpda
            </div>
         </div>
 
-        {/* Grid Stats & Settings */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Real-time Dashboard Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
            
-           {/* Activity & Contact */}
-           <div className="space-y-8">
-              <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm p-8 group">
-                 <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-8 flex items-center gap-3">
+           {/* Left Column - Real-time Stats */}
+           <div className="lg:col-span-4 space-y-8">
+              <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm p-8 group overflow-hidden relative">
+                 <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50/50 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-indigo-100/50 transition-colors"></div>
+                 <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-8 flex items-center gap-3 relative z-10">
                     <Activity size={18} className="text-indigo-500" />
-                    Activity Radar
+                    Live Metrics
                  </h3>
-                 <div className="space-y-6">
-                    <div className="p-6 rounded-3xl bg-slate-50 border border-slate-100 hover:border-indigo-100 transition-all">
+                 <div className="space-y-4 relative z-10">
+                    <div className="p-6 rounded-[2rem] bg-slate-50 border border-slate-100 hover:border-indigo-100 hover:bg-white transition-all shadow-sm hover:shadow-md">
                        <div className="flex items-center justify-between mb-4">
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Velocity</p>
-                          <span className="text-emerald-600 font-black bg-emerald-50 px-2 py-0.5 rounded-lg text-[10px] border border-emerald-100">{completionRate}%</span>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Efficiency</p>
+                          <span className="text-emerald-600 font-black bg-emerald-50 px-3 py-1 rounded-full text-[10px] border border-emerald-100">{analytics.completionRate}%</span>
                        </div>
                        <div className="flex items-center justify-between">
-                          <p className="text-2xl font-black text-slate-900">{completedTasks}</p>
-                          <p className="text-xs font-bold text-slate-400">Tasks Completed</p>
+                          <p className="text-3xl font-black text-slate-900">{analytics.tasksCompleted}</p>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Finalized</p>
                        </div>
                     </div>
 
-                    <div className="p-6 rounded-3xl bg-slate-50 border border-slate-100 hover:border-indigo-100 transition-all">
+                    <div className="p-6 rounded-[2rem] bg-slate-50 border border-slate-100 hover:border-indigo-100 hover:bg-white transition-all shadow-sm hover:shadow-md">
                        <div className="flex items-center justify-between mb-4">
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">In Pipeline</p>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Workload</p>
                        </div>
                        <div className="flex items-center justify-between">
-                          <p className="text-2xl font-black text-slate-900">{pendingTasks}</p>
-                          <p className="text-xs font-bold text-slate-400">Tasks Pending</p>
+                          <p className="text-3xl font-black text-slate-900">{analytics.tasksPending}</p>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pending</p>
                        </div>
                     </div>
                  </div>
               </div>
 
-              <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm p-8">
-                 <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-8">Intelligence Cloud</h3>
-                 <div className="space-y-6">
-                    <div className="flex items-start gap-4 p-2 rounded-2xl hover:bg-slate-50 transition-colors group">
-                       <div className="p-3 bg-slate-50 rounded-xl text-slate-400 group-hover:bg-white group-hover:text-indigo-500 transition-all border border-transparent group-hover:border-indigo-50">
-                          <Mail size={18} />
-                       </div>
-                       <div className="min-w-0">
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Primary Alias</p>
-                          <p className="text-sm font-bold text-slate-900 truncate">{user.email}</p>
-                       </div>
+              {/* Session Intelligence */}
+              <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white shadow-2xl relative overflow-hidden group">
+                <div className="absolute bottom-0 right-0 opacity-10 -mb-10 -mr-10 group-hover:scale-110 transition-transform duration-700">
+                  <Wifi size={200} />
+                </div>
+                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-8 relative z-10">Neural Instance</h3>
+                <div className="space-y-5 relative z-10">
+                  <div className="flex items-center gap-4 p-4 bg-white/5 rounded-2xl border border-white/5">
+                    <div className="p-3 bg-indigo-500/20 text-indigo-400 rounded-xl">
+                      <Cpu size={20} />
                     </div>
-                    <div className="flex items-start gap-4 p-2 rounded-2xl hover:bg-slate-50 transition-colors group">
-                       <div className="p-3 bg-slate-50 rounded-xl text-slate-400 group-hover:bg-white group-hover:text-indigo-500 transition-all border border-transparent group-hover:border-indigo-50">
-                          <LinkIcon size={18} />
-                       </div>
-                       <div className="min-w-0">
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Workspace Endpoint</p>
-                          <p className="text-sm font-bold text-indigo-600 truncate">{formData.website}</p>
-                       </div>
+                    <div>
+                      <p className="text-sm font-black">{platform}</p>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Node Architecture</p>
                     </div>
-                 </div>
+                  </div>
+                  <div className="flex items-center gap-4 p-4 bg-white/5 rounded-2xl border border-white/5">
+                    <div className="p-3 bg-purple-500/20 text-purple-400 rounded-xl">
+                      <Globe size={20} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-black">{browser}</p>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Data Interface</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-8 pt-8 border-t border-white/5">
+                   <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Neural Pulse: Stable</p>
+                </div>
               </div>
            </div>
 
-           {/* Settings */}
-           <div className="lg:col-span-2 space-y-8">
-              
-              <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm p-10">
-                 <div className="flex items-center justify-between mb-10">
-                    <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Ecosystem Control</h3>
-                 </div>
+           {/* Right Column - Matrix & Ecosystem */}
+           <div className="lg:col-span-8 space-y-8">
+              {/* Data-Driven Productivity Matrix */}
+              <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm p-10 group">
+                <div className="flex items-center justify-between mb-8">
+                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-3">
+                    <BarChart3 size={18} className="text-indigo-500" />
+                    Neural Execution Matrix
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></div>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Live Sync</span>
+                  </div>
+                </div>
 
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div 
-                      onClick={() => toggleSecuritySetting('twoFactorEnabled')}
-                      className={`p-8 rounded-[2rem] border transition-all group cursor-pointer relative overflow-hidden ${securitySettings.twoFactorEnabled ? 'bg-slate-900 border-slate-900 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'}`}
-                    >
-                       <div className="flex items-start justify-between mb-6">
-                          <div className={`p-4 rounded-2xl ${securitySettings.twoFactorEnabled ? 'bg-white/10' : 'bg-white shadow-sm'}`}>
-                             <Shield size={24} className={securitySettings.twoFactorEnabled ? 'text-indigo-400' : 'text-slate-400'} />
-                          </div>
-                          <div className={`w-12 h-6 rounded-full p-1 transition-colors ${securitySettings.twoFactorEnabled ? 'bg-indigo-500' : 'bg-slate-200'}`}>
-                             <div className={`w-4 h-4 bg-white rounded-full transition-transform ${securitySettings.twoFactorEnabled ? 'translate-x-6' : 'translate-x-0'}`}></div>
-                          </div>
-                       </div>
-                       <h4 className="font-black text-lg mb-2">Multi-Factor Auth</h4>
-                       <p className={`text-xs font-medium leading-relaxed ${securitySettings.twoFactorEnabled ? 'text-slate-400' : 'text-slate-500'}`}>
-                          Biometric & Device security layers are currently {securitySettings.twoFactorEnabled ? 'active' : 'suspended'}.
-                       </p>
-                    </div>
-
-                    <div 
-                      onClick={() => toggleSecuritySetting('notificationsEnabled')}
-                      className={`p-8 rounded-[2rem] border transition-all group cursor-pointer relative overflow-hidden ${securitySettings.notificationsEnabled ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'}`}
-                    >
-                       <div className="flex items-start justify-between mb-6">
-                          <div className={`p-4 rounded-2xl ${securitySettings.notificationsEnabled ? 'bg-white/10' : 'bg-white shadow-sm'}`}>
-                             <Bell size={24} className={securitySettings.notificationsEnabled ? 'text-white' : 'text-slate-400'} />
-                          </div>
-                          <div className={`w-12 h-6 rounded-full p-1 transition-colors ${securitySettings.notificationsEnabled ? 'bg-white/30' : 'bg-slate-200'}`}>
-                             <div className={`w-4 h-4 bg-white rounded-full transition-transform ${securitySettings.notificationsEnabled ? 'translate-x-6' : 'translate-x-0'}`}></div>
-                          </div>
-                       </div>
-                       <h4 className="font-black text-lg mb-2">Neural Alerts</h4>
-                       <p className={`text-xs font-medium leading-relaxed ${securitySettings.notificationsEnabled ? 'text-indigo-100' : 'text-slate-500'}`}>
-                          Real-time workspace sync and reminders are {securitySettings.notificationsEnabled ? 'enabled' : 'off'}.
-                       </p>
-                    </div>
-                 </div>
-
-                 <div className="mt-10 pt-10 border-t border-slate-100">
-                     <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6">Service Level</h4>
-                     <div className="bg-slate-900 p-8 rounded-[2rem] text-white shadow-2xl relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 p-12 opacity-5 group-hover:rotate-12 transition-transform duration-700">
-                           <Activity size={180} />
+                <div className="grid grid-cols-7 gap-3 mb-8">
+                  {analytics.matrix.map((item, i) => {
+                    let bgColor = 'bg-slate-50';
+                    if (item.count >= 5) bgColor = 'bg-indigo-600';
+                    else if (item.count >= 3) bgColor = 'bg-indigo-400';
+                    else if (item.count >= 1) bgColor = 'bg-indigo-200';
+                    
+                    return (
+                      <div 
+                        key={i} 
+                        className={`h-12 rounded-xl ${bgColor} transition-all hover:scale-105 cursor-pointer relative group/item`}
+                      >
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-slate-900 text-white text-[8px] font-bold rounded opacity-0 group-hover/item:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-20 shadow-xl">
+                           {format(item.date, 'MMM d')}: {item.count} Tasks
                         </div>
-                        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
-                           <div>
-                              <div className="flex items-center gap-3 mb-2">
-                                 <p className="font-black text-2xl tracking-tight">{subscription.name}</p>
-                                 <span className={`${getStatusColor(subscription.status)} text-white text-[10px] font-black px-2 py-0.5 rounded-lg uppercase tracking-widest`}>
-                                   {getStatusText(subscription.status)}
-                                 </span>
-                              </div>
-                              <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">
-                                Cycle renewal: {format(parseISO(subscription.renewalDate), 'MMMM d, yyyy')}
-                              </p>
-                           </div>
-                           <button className="bg-white/10 hover:bg-white/20 text-white text-[10px] font-black uppercase tracking-widest px-6 py-3 rounded-2xl transition-all border border-white/10 active:scale-95">
-                              Modify Tier
-                           </button>
-                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                
+                <div className="flex items-center justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  <span>Last 28 Dynamic Cycles</span>
+                  <div className="flex items-center gap-2">
+                     <span>Zero</span>
+                     <div className="flex gap-1">
+                        {[0, 1, 3, 5].map(v => (
+                          <div key={v} className={`w-2 h-2 rounded-[2px] ${v === 0 ? 'bg-slate-100' : v === 1 ? 'bg-indigo-200' : v === 3 ? 'bg-indigo-400' : 'bg-indigo-600'}`}></div>
+                        ))}
                      </div>
-                 </div>
+                     <span>Apex</span>
+                  </div>
+                </div>
               </div>
 
-              <div className="text-center">
-                 <p className="text-slate-300 text-[10px] font-black uppercase tracking-[0.3em] flex items-center justify-center gap-3">
-                   Node ID: {user.id} <span className="text-slate-200">•</span> Established: {format(parseISO(user.joinDate), 'MMMM yyyy')}
-                 </p>
+              {/* Data-Driven Project Ecosystem */}
+              <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm p-10">
+                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-8 flex items-center gap-3">
+                  <Database size={18} className="text-purple-500" />
+                  Workspace Architecture
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                   {analytics.projectStats.length > 0 ? analytics.projectStats.map((p, i) => (
+                     <div key={i} className="p-6 bg-slate-50 rounded-3xl border border-slate-100 hover:bg-white hover:shadow-md transition-all">
+                        <div className="flex items-center justify-between mb-4">
+                          <p className="text-sm font-black text-slate-700 truncate mr-2">{p.name}</p>
+                          <p className="text-[10px] font-black text-indigo-500 uppercase whitespace-nowrap">{p.count} Unit{p.count !== 1 ? 's' : ''}</p>
+                        </div>
+                        <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                          <div className="bg-indigo-500 h-full transition-all duration-1000" style={{ width: `${Math.max(5, p.saturation)}%` }} />
+                        </div>
+                        <p className="text-[10px] font-bold text-slate-400 mt-3 uppercase tracking-widest text-right">{Math.round(p.saturation)}% Weight</p>
+                     </div>
+                   )) : (
+                     <div className="col-span-full p-12 text-center text-slate-400 font-bold uppercase tracking-widest text-xs bg-slate-50 rounded-3xl border border-dashed border-slate-200">
+                        No active project nodes found
+                     </div>
+                   )}
+                </div>
               </div>
-
            </div>
         </div>
-
       </div>
     </div>
   );

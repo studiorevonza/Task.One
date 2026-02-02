@@ -1,46 +1,31 @@
-const mysql = require('mysql2/promise');
+const mongoose = require('mongoose');
+const { setDbConnected } = require('../utils/dbHelper');
 require('dotenv').config();
 
-// Determine if we're in production
-const isProduction = process.env.NODE_ENV === 'production';
-
-const pool = mysql.createPool({
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT) || 3306,
-  database: process.env.DB_NAME || 'tasq_one',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD,
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-  // SSL configuration for production (Render)
-  ssl: isProduction ? { rejectUnauthorized: false } : false,
-});
-
-
-// Test database connection
-pool.getConnection()
-  .then(connection => {
-    console.log('✅ Database connected successfully');
-    connection.release();
-  })
-  .catch(err => {
-    console.error('❌ Database connection error:', err.stack);
-  });
-
-// Handle pool errors
-pool.on('error', (err) => {
-  console.error('Unexpected error on idle client', err);
-  process.exit(-1);
-});
-
-module.exports = {
-  query: async (text, params) => {
-    const [rows] = await pool.execute(text, params);
-    return rows;
-  },
-  getClient: async () => {
-    return await pool.getConnection();
-  },
-  pool
+const connectDB = async () => {
+  try {
+    // Use local MongoDB for development if MONGO_LOCAL is set to "1", otherwise use Atlas
+    const connStr = process.env.MONGO_LOCAL === "1"
+      ? 'mongodb://localhost:27017/tasq_one'  // Local MongoDB
+      : process.env.MONGO_URI;  // MongoDB Atlas
+    
+    if (!connStr) {
+      throw new Error('MONGO_URI is not defined in .env');
+    }
+    
+    console.log(`Connection String (masked): ${connStr.replace(/:([^:@]+)@/, ':****@')}`);
+    
+    const conn = await mongoose.connect(connStr);
+    
+    console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
+    setDbConnected(true); // Set connection status to true
+  } catch (error) {
+    console.error(`❌ Error: ${error.message}`);
+    console.error('💡 Tip: For local development, set MONGO_LOCAL=1 in your .env file to use local MongoDB');
+    // Don't exit the process - let the app continue with in-memory storage
+    // process.exit(1);  // COMMENTED OUT - don't crash the app
+    setDbConnected(false); // Set connection status to false
+  }
 };
+
+module.exports = connectDB;

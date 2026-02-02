@@ -1,42 +1,37 @@
 const express = require('express');
 const { authenticateToken } = require('../middleware/auth');
-
-// Use global database if available, fallback to mock
-const getDb = () => {
-  return global.db || {
-    query: async (sql, params) => {
-      console.warn('⚠️ Database not connected - using in-memory storage');
-      return [];
-    }
-  };
-};
-
-const db = getDb();
+const User = require('../models/User');
+const { dbOperation, inMemoryOperations, isDbConnected } = require('../utils/dbHelper');
 
 const router = express.Router();
 
 // Get user profile
 router.get('/profile', authenticateToken, async (req, res, next) => {
   try {
-    // Check if database is available
-    if (!global.db) {
-      return res.json({
-        success: true,
-        message: 'Database not connected - using in-memory storage',
-        data: {
-          name: req.user?.name || 'User',
-          role: 'User',
-          location: 'San Francisco, CA',
-          bio: 'Product Designer passionate about creating exceptional digital experiences',
-          website: `tasq.one/u/${req.user?.userId || 'temp'}`,
-          avatar: ''
-        }
+    let user;
+    if (isDbConnected()) {
+      // Use database
+      user = await dbOperation(async () => {
+        return await User.findById(req.user.userId)
+          .select('id name email avatar_url created_at');
+      });
+    } else {
+      // Use in-memory storage
+      user = inMemoryOperations.findUserById(req.user.userId);
+    }
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
       });
     }
-    
+
     res.json({
       success: true,
-      message: 'User profile endpoint - to be implemented'
+      data: {
+        user
+      }
     });
   } catch (error) {
     next(error);

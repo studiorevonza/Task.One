@@ -90,7 +90,7 @@ const WorkspaceIntelligence: React.FC<WorkspaceIntelligenceProps> = ({ tasks, pr
   }, [projects, tasks]);
 
   return (
-    <div className="p-4 md:p-10 max-w-7xl mx-auto space-y-10 animate-fade-in-up">
+    <div className="p-4 md:p-10 max-w-7xl mx-auto space-y-10 animate-fade-in-up h-full overflow-y-auto custom-scrollbar">
       {/* Dynamic Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>

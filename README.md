@@ -134,7 +134,7 @@ tasq.one/
 ├── services/
 │   └── geminiService.ts  # AI service integration
 ├── public/
-│   └── one.png          # Application logo
+│   └── logo.svg         # Application logo (SVG)
 ├── App.tsx              # Main application component
 ├── index.html           # HTML template
 ├── types.ts             # TypeScript interfaces

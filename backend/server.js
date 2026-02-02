@@ -1,9 +1,9 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
-require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
@@ -12,11 +12,36 @@ const taskRoutes = require('./routes/tasks');
 const timeRoutes = require('./routes/time');
 const categoryRoutes = require('./routes/categories');
 const tagRoutes = require('./routes/tags');
+const notificationRoutes = require('./routes/notifications');
 
 const { errorHandler } = require('./middleware/errorHandler');
 const { notFound } = require('./middleware/notFound');
 
 const app = express();
+const http = require('http');
+const { Server } = require('socket.io');
+const { setDbConnected } = require('./utils/dbHelper');
+
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: process.env.CLIENT_URL || 'http://localhost:3000',
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    credentials: true
+  }
+});
+
+// Neural Socket Connection
+io.on('connection', (socket) => {
+  console.log('📡 Neural Link Established:', socket.id);
+  
+  socket.on('disconnect', () => {
+    console.log('🔌 Neural Link Severed:', socket.id);
+  });
+});
+
+// Global io object for routes
+app.set('io', io);
 
 // Security middleware
 app.use(helmet());
@@ -51,133 +76,24 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Graceful database connection handling
-let dbConnected = false;
-global.db = null; // Make database available globally
-
-// Try to initialize database connection
-const initDbConnection = async () => {
-  try {
-    const dbModule = require('./config/db');
-    await dbModule.pool.getConnection();
-    console.log('✅ Database connected successfully');
-    global.db = dbModule; // Make db available globally
-    dbConnected = true;
-  } catch (error) {
-    console.error('⚠️ Database connection pending:', error.message);
-    // Don't exit on Render - allow server to start anyway
-    if (process.env.NODE_ENV !== 'production') {
-      console.error('❌ Database connection failed - exiting');
-      process.exit(1);
-    } else {
-      console.warn('⚠️ Database connection failed in production - server will start without database');
-    }
-  }
-};
-
 // Initialize database connection
-initDbConnection();
+const connectDB = require('./config/db');
 
-// Add temporary in-memory storage for user profiles
-const userProfiles = new Map();
-const userSecurity = new Map();
-
-// Mock user profile endpoints (temporary until database is ready)
-app.get('/api/users/:userId/profile', (req, res) => {
-  try {
-    const { userId } = req.params;
-    const profile = userProfiles.get(userId) || {
-      name: req.user?.name || 'User',
-      role: 'User',
-      location: 'San Francisco, CA',
-      bio: 'Product Designer passionate about creating exceptional digital experiences',
-      website: `tasq.one/u/${userId}`,
-      avatar: ''
-    };
-    
-    res.json({
-      success: true,
-      data: profile
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch profile'
-    });
-  }
-});
-
-app.put('/api/users/:userId/profile', (req, res) => {
-  try {
-    const { userId } = req.params;
-    const profileData = req.body;
-    
-    // Store in memory
-    userProfiles.set(userId, {
-      ...profileData,
-      updatedAt: new Date().toISOString()
-    });
-    
-    res.json({
-      success: true,
-      message: 'Profile updated successfully',
-      data: profileData
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Failed to update profile'
-    });
-  }
-});
-
-app.get('/api/users/:userId/security', (req, res) => {
-  try {
-    const { userId } = req.params;
-    const security = userSecurity.get(userId) || {
-      twoFactorEnabled: true,
-      biometricEnabled: true,
-      notificationsEnabled: true,
-      emailNotifications: true,
-      smsNotifications: false,
-      pushNotifications: true
-    };
-    
-    res.json({
-      success: true,
-      data: security
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch security settings'
-    });
-  }
-});
-
-app.put('/api/users/:userId/security', (req, res) => {
-  try {
-    const { userId } = req.params;
-    const securityData = req.body;
-    
-    // Store in memory
-    userSecurity.set(userId, {
-      ...securityData,
-      updatedAt: new Date().toISOString()
-    });
-    
-    res.json({
-      success: true,
-      message: 'Security settings updated successfully',
-      data: securityData
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Failed to update security settings'
-    });
-  }
-});
+// Connect to MongoDB with error handling - DON'T let it crash the app
+let dbConnected = false;
+connectDB()
+  .then(() => {
+    dbConnected = true;
+    setDbConnected(true); // Set connection status
+    console.log('✅ Database: Connected');
+  })
+  .catch((error) => {
+    console.error('❌ Database connection failed:', error.message);
+    console.warn('⚠️ Running in development with limited functionality');
+    // Don't exit the process - app continues with in-memory storage
+    dbConnected = false;
+    setDbConnected(false); // Set connection status
+  });
 
 // API Routes
 app.use('/api/auth', authRoutes);
@@ -187,6 +103,7 @@ app.use('/api/tasks', taskRoutes);
 app.use('/api/time', timeRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/tags', tagRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Error handling middleware
 app.use(notFound);
@@ -194,8 +111,8 @@ app.use(errorHandler);
 
 // Start server
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+server.listen(PORT, () => {
+  console.log(`🚀 Neural Engine Synchronized on port ${PORT}`);
   console.log(`📡 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🔗 API Health: http://localhost:${PORT}/api/health`);
   if (dbConnected) {

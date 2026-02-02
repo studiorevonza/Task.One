@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Project, Category, Task, TaskStatus, Priority, ProjectMilestone } from '../types';
-import { Briefcase, User, Plus, Calendar, ArrowLeft, Trash2, Edit2, X, FolderPlus, Tag, AlignLeft, Save, Flag, CheckSquare, ClipboardList, Check, Trophy, Search } from 'lucide-react';
+import { Briefcase, User, Plus, Calendar, ArrowLeft, Trash2, Edit2, X, FolderPlus, Tag, AlignLeft, Save, Flag, CheckSquare, ClipboardList, Check, Trophy, Search, Clock } from 'lucide-react';
 import { format, isPast, isToday } from 'date-fns';
 
 interface ProjectManagerProps {
@@ -32,10 +32,16 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
   // Views: 'LIST' | 'DETAIL'
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(initialSelectedId || null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentTime, setCurrentTime] = useState(new Date());
   
   // Modal States
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Synchronize state if initialSelectedId changes
   useEffect(() => {
@@ -244,80 +250,107 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
   };
 
   if (selectedProject) {
+    const overdueMilestones = (selectedProject.milestones || []).filter(m => !m.completed && isPast(new Date(m.dueDate)) && !isToday(new Date(m.dueDate))).length;
+    const pendingTasks = projectTasks.filter(t => t.status !== TaskStatus.DONE).length;
+
     return (
-      <div className="flex-1 overflow-y-auto bg-slate-50/50">
-        <div className="px-4 md:px-8 py-6 border-b border-slate-100 bg-white sticky top-0 z-10">
-          <div className="max-w-5xl mx-auto w-full">
-            <div className="flex items-center justify-between mb-6">
-              <button 
-                onClick={() => setSelectedProjectId(null)}
-                className="group flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors font-medium text-sm"
-              >
-                <div className="p-1.5 rounded-full bg-slate-50 group-hover:bg-slate-100 border border-slate-200 transition-colors">
-                  <ArrowLeft size={16} />
+      <div className="flex-1 overflow-y-auto bg-slate-50/50 custom-scrollbar">
+        {/* Real-time Project Command Header */}
+        <div className="px-4 md:px-8 py-8 border-b border-slate-200 bg-white sticky top-0 z-20 backdrop-blur-md bg-white/90">
+          <div className="max-w-6xl mx-auto w-full">
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-4">
+                <button 
+                  onClick={() => setSelectedProjectId(null)}
+                  className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all active:scale-95"
+                >
+                  <ArrowLeft size={18} />
+                </button>
+                <div className="h-8 w-px bg-slate-200 hidden md:block"></div>
+                <div className="hidden md:flex flex-col">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Mission Start</span>
+                  <span className="text-xs font-bold text-slate-700">{format(currentTime, 'HH:mm:ss')} · LIVE SYNC</span>
                 </div>
-                Back to Projects
-              </button>
+              </div>
               
               <div className="flex items-center gap-2">
+                <div className="hidden lg:flex items-center gap-6 mr-4">
+                   <div className="text-right">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Health</p>
+                      <p className={`text-xs font-black uppercase ${overdueMilestones > 0 ? 'text-red-500' : 'text-emerald-500'}`}>{overdueMilestones > 0 ? 'Critical' : 'Optimal'}</p>
+                   </div>
+                   <div className="text-right">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Load</p>
+                      <p className="text-xs font-black text-slate-700 uppercase">{pendingTasks} Active Units</p>
+                   </div>
+                </div>
                 <button 
                   onClick={openEditModal}
-                  className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-50 rounded-lg transition-colors border border-transparent hover:border-slate-200"
-                  title="Edit Project"
+                  className="p-2.5 bg-slate-50 text-slate-600 hover:bg-white hover:shadow-md border border-slate-200 rounded-xl transition-all active:scale-95"
                 >
                   <Edit2 size={18} />
                 </button>
                 <button 
                   onClick={handleDeleteProject}
-                  className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-100"
-                  title="Delete Project"
+                  className="p-2.5 bg-red-50 text-red-600 hover:bg-white hover:shadow-md border border-red-100 rounded-xl transition-all active:scale-95"
                 >
                   <Trash2 size={18} />
                 </button>
               </div>
             </div>
 
-            <div className="flex flex-col md:flex-row gap-6 md:gap-10 items-start justify-between">
-              <div className="flex-1">
-                 <div className="flex flex-wrap items-center gap-3 mb-3">
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider border flex items-center gap-1.5 ${selectedProject.category === Category.COMPANY ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-cyan-50 text-cyan-700 border-cyan-200'}`}>
+            <div className="flex flex-col lg:flex-row gap-8 items-end">
+              <div className="flex-1 min-w-0">
+                 <div className="flex flex-wrap items-center gap-3 mb-4">
+                    <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border flex items-center gap-1.5 ${selectedProject.category === Category.COMPANY ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100'}`}>
                       {selectedProject.category === Category.COMPANY ? <Briefcase size={12} /> : <User size={12} />}
                       {selectedProject.category}
                     </span>
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider border flex items-center gap-1.5 ${getPriorityColor(selectedProject.priority)}`}>
+                    <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border flex items-center gap-1.5 ${getPriorityColor(selectedProject.priority)}`}>
                       <Flag size={12} fill="currentColor" />
                       {selectedProject.priority} Priority
                     </span>
-                    <span className="px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider border bg-slate-50 text-slate-600 border-slate-200 flex items-center gap-1.5">
-                      <Calendar size={12} />
-                      Due {selectedProject.dueDate}
-                    </span>
+                    <div className="flex items-center gap-2 px-3 py-1 bg-slate-900 text-white rounded-full text-[10px] font-bold uppercase tracking-widest shadow-lg shadow-slate-200">
+                       <Clock size={12} />
+                       Due in {Math.max(0, Math.ceil((new Date(selectedProject.dueDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))} Days
+                    </div>
                  </div>
-                 <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight mb-4">{selectedProject.name}</h1>
-                 <p className="text-slate-500 text-lg leading-relaxed max-w-2xl">{selectedProject.description}</p>
+                 <h1 className="text-4xl md:text-5xl font-bold text-slate-900 tracking-tight mb-4 break-words">{selectedProject.name}</h1>
+                 <p className="text-slate-500 text-lg leading-relaxed max-w-3xl font-medium">{selectedProject.description}</p>
               </div>
 
-              <div className="w-full md:w-64 bg-slate-50 rounded-2xl p-5 border border-slate-200 shadow-sm shrink-0">
-                  <div className="flex justify-between items-center mb-3">
-                     <span className="text-sm font-bold text-slate-700">Project Progress</span>
-                     <span className="text-2xl font-bold text-slate-900">{progress}%</span>
-                  </div>
-                  <div className="h-3 w-full bg-slate-200 rounded-full overflow-hidden mb-4">
-                     <div 
-                       className={`h-full transition-all duration-1000 ease-out rounded-full ${progress === 100 ? 'bg-emerald-500' : 'bg-slate-900'}`} 
-                       style={{ width: `${progress}%` }}
-                     />
-                  </div>
-                  <div className="flex justify-between text-xs text-slate-500 font-medium">
-                     <span>{projectTasks.filter(t => t.status === TaskStatus.DONE).length} Completed</span>
-                     <span>{projectTasks.length} Total Tasks</span>
+              <div className="w-full lg:w-80 shrink-0">
+                  <div className="bg-slate-900 rounded-3xl p-6 text-white shadow-2xl relative overflow-hidden group">
+                     <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/20 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-indigo-500/30 transition-colors"></div>
+                     <div className="relative z-10">
+                        <div className="flex justify-between items-center mb-4">
+                           <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-[0.2em]">Efficiency Score</span>
+                           <span className="text-3xl font-bold">{progress}%</span>
+                        </div>
+                        <div className="h-3 w-full bg-white/10 rounded-full overflow-hidden mb-6 shadow-inner">
+                           <div 
+                             className="h-full bg-indigo-500 transition-all duration-1000 ease-out rounded-full shadow-[0_0_15px_rgba(99,102,241,0.5)]" 
+                             style={{ width: `${progress}%` }}
+                           />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                           <div className="p-3 bg-white/5 rounded-2xl border border-white/5">
+                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter mb-1">Finalized</p>
+                              <p className="text-lg font-bold">{projectTasks.filter(t => t.status === TaskStatus.DONE).length}</p>
+                           </div>
+                           <div className="p-3 bg-white/5 rounded-2xl border border-white/5">
+                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter mb-1">In Queue</p>
+                              <p className="text-lg font-bold">{pendingTasks}</p>
+                           </div>
+                        </div>
+                     </div>
                   </div>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="max-w-5xl mx-auto px-4 md:px-8 py-8 space-y-8 pb-32">
+        <div className="max-w-6xl mx-auto px-4 md:px-8 py-8 space-y-8 pb-32">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col">
                 <div className="flex items-center justify-between mb-4">
@@ -475,7 +508,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                 <button 
                   type="submit"
                   disabled={!newTaskTitle}
-                  className="bg-slate-900 text-white px-6 py-2 rounded-lg text-xs font-black uppercase tracking-widest hover:bg-black transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+                  className="bg-slate-900 text-white px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-black transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
                 >
                   Add Task
                 </button>
@@ -508,11 +541,11 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                               {task.title}
                           </p>
                           {task.status === TaskStatus.DONE && (
-                              <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 self-start md:self-auto">Completed</span>
+                              <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 self-start md:self-auto">Completed</span>
                           )}
                         </div>
                         
-                        <div className="flex flex-wrap items-center gap-3 text-[10px] font-black uppercase tracking-widest text-slate-400 mt-2">
+                        <div className="flex flex-wrap items-center gap-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 mt-2">
                           <span className={`px-2 py-0.5 rounded border ${getPriorityColor(task.priority)}`}>
                             {task.priority}
                           </span>
@@ -542,7 +575,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
             <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-fade-in overflow-hidden flex flex-col max-h-[90vh]">
               <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                   <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                     <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                     <div className="p-2 bg-slate-900/10 rounded-lg text-slate-900">
                         <Edit2 size={20} strokeWidth={2.5} />
                      </div>
                      Edit Project
@@ -554,14 +587,14 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                 <div className="p-6 overflow-y-auto space-y-5">
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 ml-1">Project Name</label>
-                    <input type="text" required className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-slate-800 font-medium focus:ring-2 focus:ring-primary/10 focus:border-primary focus:bg-white outline-none transition-all placeholder:text-slate-400" value={formName} onChange={(e) => setFormName(e.target.value)} />
+                    <input type="text" required className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-slate-800 font-medium focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 focus:bg-white outline-none transition-all placeholder:text-slate-400" value={formName} onChange={(e) => setFormName(e.target.value)} />
                   </div>
                   
                   <div className="grid grid-cols-2 gap-5">
                      <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 ml-1">Category</label>
                         <div className="relative">
-                          <select className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-xl p-3.5 pr-8 text-slate-700 font-medium focus:ring-2 focus:ring-primary/10 focus:border-primary focus:bg-white outline-none transition-all" value={formCategory} onChange={(e) => setFormCategory(e.target.value as Category)}>
+                          <select className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-xl p-3.5 pr-8 text-slate-700 font-medium focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 focus:bg-white outline-none transition-all" value={formCategory} onChange={(e) => setFormCategory(e.target.value as Category)}>
                             <option value={Category.COMPANY}>Company</option>
                             <option value={Category.PERSONAL}>Personal</option>
                           </select>
@@ -571,7 +604,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                      <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 ml-1">Priority</label>
                         <div className="relative">
-                          <select className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-xl p-3.5 pr-8 text-slate-700 font-medium focus:ring-2 focus:ring-primary/10 focus:border-primary focus:bg-white outline-none transition-all" value={formPriority} onChange={(e) => setFormPriority(e.target.value as Priority)}>
+                          <select className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-xl p-3.5 pr-8 text-slate-700 font-medium focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 focus:bg-white outline-none transition-all" value={formPriority} onChange={(e) => setFormPriority(e.target.value as Priority)}>
                             {Object.values(Priority).map(p => <option key={p} value={p}>{p}</option>)}
                           </select>
                           <Flag className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
@@ -582,7 +615,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 ml-1">Deadline</label>
                     <div className="relative">
-                      <input type="date" required className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 pl-10 text-slate-700 font-medium focus:ring-2 focus:ring-primary/10 focus:border-primary focus:bg-white outline-none transition-all" value={formDueDate} onChange={(e) => setFormDueDate(e.target.value)} />
+                      <input type="date" required className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 pl-10 text-slate-700 font-medium focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 focus:bg-white outline-none transition-all" value={formDueDate} onChange={(e) => setFormDueDate(e.target.value)} />
                       <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
                     </div>
                   </div>
@@ -590,7 +623,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 ml-1">Description</label>
                     <div className="relative">
-                      <textarea className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 pl-10 text-slate-700 focus:ring-2 focus:ring-primary/10 focus:border-primary focus:bg-white outline-none transition-all resize-none min-h-[100px]" rows={3} value={formDesc} onChange={(e) => setFormDesc(e.target.value)} />
+                      <textarea className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 pl-10 text-slate-700 focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 focus:bg-white outline-none transition-all resize-none min-h-[100px]" rows={3} value={formDesc} onChange={(e) => setFormDesc(e.target.value)} />
                       <AlignLeft className="absolute left-3.5 top-4 text-slate-400 pointer-events-none" size={18} />
                     </div>
                   </div>
@@ -598,7 +631,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
 
                 <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-3 mt-auto">
                   <button type="button" onClick={() => setIsEditModalOpen(false)} className="px-5 py-2.5 text-slate-600 font-semibold hover:bg-white hover:shadow-sm hover:text-slate-800 rounded-xl transition-all text-sm border border-transparent hover:border-slate-200">Cancel</button>
-                  <button type="submit" className="px-6 py-2.5 bg-primary text-white font-semibold rounded-xl hover:bg-blue-600 shadow-lg shadow-blue-500/20 active:scale-95 transition-all text-sm flex items-center gap-2"><Save size={18} strokeWidth={2.5} /> Save Changes</button>
+                  <button type="submit" className="px-6 py-2.5 bg-slate-900 text-white font-semibold rounded-xl hover:bg-black shadow-lg shadow-slate-900/20 active:scale-95 transition-all text-sm flex items-center gap-2"><Save size={18} strokeWidth={2.5} /> Save Changes</button>
                 </div>
               </form>
             </div>
@@ -612,27 +645,27 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
     <div className="p-4 md:p-8">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
-          <h2 className="text-2xl md:text-3xl font-bold text-slate-800">Projects</h2>
-          <p className="text-slate-500 text-sm md:text-base">Oversee company and personal initiatives.</p>
+          <h2 className="text-2xl md:text-3xl font-black text-slate-900">Projects</h2>
+          <p className="text-slate-500 text-sm md:text-base font-medium">Oversee company and personal initiatives.</p>
         </div>
         <button 
           onClick={openCreateModal}
-          className="w-full md:w-auto bg-primary hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 shadow-md transition-all"
+          className="w-full md:w-auto bg-slate-900 hover:bg-black text-white px-6 py-2.5 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-slate-200 transition-all active:scale-95"
         >
-          <Plus size={20} />
+          <Plus size={20} strokeWidth={3} />
           New Project
         </button>
       </div>
 
       {/* Search Bar */}
-      <div className="mb-8 relative max-w-xl">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+      <div className="mb-8 relative max-w-xl group">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-slate-900 transition-colors" size={18} />
         <input 
           type="text" 
           placeholder="Search projects by name or description..." 
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-3 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-300 transition-all shadow-sm"
+          className="w-full bg-white border border-slate-200 rounded-xl pl-12 pr-4 py-3.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-4 focus:ring-slate-900/5 focus:border-slate-400 transition-all shadow-sm"
         />
       </div>
 
@@ -646,33 +679,33 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
             <div 
               key={project.id} 
               onClick={() => setSelectedProjectId(project.id)}
-              className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-lg hover:border-primary/30 transition-all p-6 flex flex-col cursor-pointer group"
+              className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl hover:border-slate-400 transition-all p-6 flex flex-col cursor-pointer group relative overflow-hidden active:scale-[0.98]"
             >
               <div className="flex justify-between items-start mb-4">
-                <div className={`p-3 rounded-lg ${project.category === Category.COMPANY ? 'bg-purple-100 text-purple-600' : 'bg-cyan-100 text-cyan-600'}`}>
+                <div className={`p-3 rounded-xl ${project.category === Category.COMPANY ? 'bg-indigo-100 text-indigo-600' : 'bg-emerald-100 text-emerald-600'}`}>
                   {project.category === Category.COMPANY ? <Briefcase size={24} /> : <User size={24} />}
                 </div>
                 <div className="text-right">
-                   <div className={`text-[10px] font-bold uppercase tracking-wider mb-1 px-2 py-0.5 rounded border inline-block ${getPriorityColor(project.priority)}`}>
+                   <div className={`text-[10px] font-black uppercase tracking-wider mb-1 px-2.5 py-1 rounded-full border inline-block ${getPriorityColor(project.priority)}`}>
                       {project.priority}
                    </div>
-                   <div className="text-xs font-semibold text-slate-400 block">
+                   <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mt-1">
                      Due {project.dueDate}
                    </div>
                 </div>
               </div>
               
-              <h3 className="text-lg font-bold text-slate-800 mb-2 group-hover:text-primary transition-colors">{project.name}</h3>
-              <p className="text-slate-500 text-sm mb-6 line-clamp-2 flex-1">{project.description}</p>
+              <h3 className="text-lg font-black text-slate-900 mb-2 transition-colors group-hover:text-indigo-600">{project.name}</h3>
+              <p className="text-slate-500 text-sm mb-6 line-clamp-2 flex-1 font-medium">{project.description}</p>
               
               <div className="mt-auto">
-                <div className="flex justify-between text-xs text-slate-500 mb-1">
+                <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">
                   <span>Progress</span>
                   <span>{pProgress}%</span>
                 </div>
-                <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden shadow-inner">
                   <div 
-                    className={`h-2 rounded-full transition-all duration-500 ${pProgress === 100 ? 'bg-emerald-500' : 'bg-slate-900'}`}
+                    className={`h-full rounded-full transition-all duration-1000 ${pProgress === 100 ? 'bg-emerald-500' : 'bg-slate-900'}`}
                     style={{ width: `${pProgress}%` }}
                   ></div>
                 </div>
@@ -681,18 +714,18 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
         )})}
         
         {filteredProjects.length === 0 && (
-          <div className="col-span-full py-20 text-center text-slate-400 bg-slate-50 rounded-xl border-2 border-dashed border-slate-200">
+          <div className="col-span-full py-20 text-center text-slate-400 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
              {searchTerm ? (
                 <>
                   <Search size={48} className="mx-auto mb-4 opacity-20" />
-                  <p className="text-lg font-medium text-slate-600">No projects match your search</p>
-                  <button onClick={() => setSearchTerm('')} className="text-sm text-primary hover:underline mt-2">Clear search</button>
+                  <p className="text-lg font-bold text-slate-600">No projects match your search</p>
+                  <button onClick={() => setSearchTerm('')} className="text-sm text-indigo-600 font-bold hover:underline mt-2">Clear search</button>
                 </>
              ) : (
                 <>
                   <Briefcase size={48} className="mx-auto mb-4 opacity-20" />
-                  <p className="text-lg font-medium text-slate-600">No projects yet</p>
-                  <p className="text-sm">Create your first project to get started.</p>
+                  <p className="text-lg font-bold text-slate-600">No projects yet</p>
+                  <p className="text-sm font-medium">Create your first project to get started.</p>
                 </>
              )}
           </div>
@@ -704,7 +737,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
           <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-fade-in overflow-hidden flex flex-col max-h-[90vh]">
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                 <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                   <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                   <div className="p-2 bg-slate-900/10 rounded-lg text-slate-900">
                       <FolderPlus size={20} strokeWidth={2.5} />
                    </div>
                    Create New Project
@@ -716,14 +749,14 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
               <div className="p-6 overflow-y-auto space-y-5">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 ml-1">Project Name</label>
-                  <input type="text" required className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-slate-800 font-medium focus:ring-2 focus:ring-primary/10 focus:border-primary focus:bg-white outline-none transition-all placeholder:text-slate-400" value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="e.g. Q4 Marketing Campaign" autoFocus />
+                  <input type="text" required className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-slate-800 font-medium focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 focus:bg-white outline-none transition-all placeholder:text-slate-400" value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="e.g. Q4 Marketing Campaign" autoFocus />
                 </div>
                 
                 <div className="grid grid-cols-2 gap-5">
                    <div>
                       <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 ml-1">Category</label>
                       <div className="relative">
-                        <select className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-xl p-3.5 pr-8 text-slate-700 font-medium focus:ring-2 focus:ring-primary/10 focus:border-primary focus:bg-white outline-none transition-all" value={formCategory} onChange={(e) => setFormCategory(e.target.value as Category)}>
+                        <select className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-xl p-3.5 pr-8 text-slate-700 font-medium focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 focus:bg-white outline-none transition-all" value={formCategory} onChange={(e) => setFormCategory(e.target.value as Category)}>
                           <option value={Category.COMPANY}>Company</option>
                           <option value={Category.PERSONAL}>Personal</option>
                         </select>
@@ -733,7 +766,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                    <div>
                       <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 ml-1">Priority</label>
                       <div className="relative">
-                        <select className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-xl p-3.5 pr-8 text-slate-700 font-medium focus:ring-2 focus:ring-primary/10 focus:border-primary focus:bg-white outline-none transition-all" value={formPriority} onChange={(e) => setFormPriority(e.target.value as Priority)}>
+                        <select className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-xl p-3.5 pr-8 text-slate-700 font-medium focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 focus:bg-white outline-none transition-all" value={formPriority} onChange={(e) => setFormPriority(e.target.value as Priority)}>
                           {Object.values(Priority).map(p => <option key={p} value={p}>{p}</option>)}
                         </select>
                         <Flag className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
@@ -744,7 +777,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                 <div>
                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 ml-1">Deadline</label>
                    <div className="relative">
-                     <input type="date" required className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 pl-10 text-slate-700 font-medium focus:ring-2 focus:ring-primary/10 focus:border-primary focus:bg-white outline-none transition-all" value={formDueDate} onChange={(e) => setFormDueDate(e.target.value)} />
+                     <input type="date" required className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 pl-10 text-slate-700 font-medium focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 focus:bg-white outline-none transition-all" value={formDueDate} onChange={(e) => setFormDueDate(e.target.value)} />
                      <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
                    </div>
                 </div>
@@ -752,7 +785,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 ml-1">Description</label>
                   <div className="relative">
-                    <textarea className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 pl-10 text-slate-700 focus:ring-2 focus:ring-primary/10 focus:border-primary focus:bg-white outline-none transition-all resize-none min-h-[100px]" rows={3} value={formDesc} onChange={(e) => setFormDesc(e.target.value)} placeholder="Describe the main goals and requirements..." />
+                    <textarea className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 pl-10 text-slate-700 focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 focus:bg-white outline-none transition-all resize-none min-h-[100px]" rows={3} value={formDesc} onChange={(e) => setFormDesc(e.target.value)} placeholder="Describe the main goals and requirements..." />
                     <AlignLeft className="absolute left-3.5 top-4 text-slate-400 pointer-events-none" size={18} />
                   </div>
                 </div>
@@ -760,7 +793,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({
 
               <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-3 mt-auto">
                 <button type="button" onClick={() => setIsCreateModalOpen(false)} className="px-5 py-2.5 text-slate-600 font-semibold hover:bg-white hover:shadow-sm hover:text-slate-800 rounded-xl transition-all text-sm border border-transparent hover:border-slate-200">Cancel</button>
-                <button type="submit" className="px-6 py-2.5 bg-primary text-white font-semibold rounded-xl hover:bg-blue-600 shadow-lg shadow-blue-500/20 active:scale-95 transition-all text-sm flex items-center gap-2"><Plus size={18} strokeWidth={2.5} /> Create Project</button>
+                <button type="submit" className="px-6 py-2.5 bg-slate-900 text-white font-semibold rounded-xl hover:bg-black shadow-lg shadow-slate-900/20 active:scale-95 transition-all text-sm flex items-center gap-2"><Plus size={18} strokeWidth={2.5} /> Create Project</button>
               </div>
             </form>
           </div>
