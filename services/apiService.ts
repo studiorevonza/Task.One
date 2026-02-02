@@ -1,5 +1,5 @@
 // API Service for tasq.one
-const API_BASE_URL = '/api';  // Relative path works for both local and deployed versions
+const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || '/api';  // Use environment variable or default to relative path
 
 class ApiService {
   private token: string | null;
