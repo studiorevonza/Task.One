@@ -1,0 +1,21 @@
+{
+    "builds": [
+        {
+            "src": "package.json",
+            "use": "@vercel/static-build",
+            "config": {
+                "distDir": "dist"
+            }
+        }
+    ],
+    "routes": [
+        {
+            "src": "/(.*)",
+            "dest": "/index.html"
+        }
+    ],
+    "env": {
+        "VITE_API_URL": "https://tasq-one-backend.onrender.com/api",
+        "VITE_GOOGLE_CLIENT_ID": "436152930223-2p91794cslr6tqks1nlpekvqig2hn3ch.apps.googleusercontent.com"
+    }
+}
