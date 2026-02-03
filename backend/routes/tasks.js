@@ -15,8 +15,8 @@ const taskValidation = [
   body('status').optional().isIn(['todo', 'in_progress', 'completed', 'cancelled']).withMessage('Invalid status'),
   body('priority').optional().isIn(['low', 'medium', 'high']).withMessage('Invalid priority'),
   body('due_date').optional().isISO8601().withMessage('Invalid date format'),
-  body('project_id').optional().isMongoId().withMessage('Project ID must be a valid ID'), // Changed from isInt to isMongoId or generic string check
-  body('assigned_to').optional().isMongoId().withMessage('Assigned to must be a valid ID')
+  body('project_id').optional({ checkFalsy: true }).trim(), // Allow any string or null
+  body('assigned_to').optional({ checkFalsy: true }).trim() // Allow any string or null
 ];
 
 // Get all tasks for user with filters

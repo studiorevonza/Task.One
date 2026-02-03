@@ -27,28 +27,36 @@ class ApiService {
   }
 
   // Generic API request method
-  async request(endpoint, options = {}) {
+  async request(endpoint, options: any = {}) {
     const url = `${API_BASE_URL}${endpoint}`;
     const config = {
       headers: this.getAuthHeaders(),
       ...options
     };
 
+    console.log('🌐 API Request:', { url, method: options.method || 'GET' });
+
     try {
       const response = await fetch(url, config);
+      
+      console.log('📡 Response status:', response.status, response.statusText);
+      
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || 'API request failed');
+        console.error('❌ API Error Response:', data);
+        throw new Error(data.message || `API request failed with status ${response.status}`);
       }
 
+      console.log('✅ API Success:', data);
       return data;
     } catch (error) {
-      console.error('API Error:', error);
+      console.error('💥 API Error:', error);
       
       // If it's a network error or connection refused, provide helpful message
       if (error instanceof TypeError && error.message.includes('fetch')) {
-        throw new Error('Unable to connect to server. Please make sure the backend is running.');
+        console.error('🔌 Network error - backend might not be running');
+        throw new Error('Unable to connect to server. Please make sure the backend is running on port 3001.');
       }
       
       // Handle specific API errors

@@ -15,7 +15,6 @@ import UserProfile from './components/UserProfile';
 import Logo from './components/Logo';
 import ResetPassword from './components/ResetPassword';
 import { View, Task, Project, TaskStatus, User, Priority } from './types';
-import { INITIAL_PROJECTS, INITIAL_TASKS } from './constants';
 import NotificationCenter from './components/NotificationCenter';
 import { io } from 'socket.io-client';
 import { Menu, X, Bell } from 'lucide-react';
@@ -76,10 +75,10 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // App State
+  // App State - Start with empty arrays, data will be fetched from database
   const [currentView, setCurrentView] = useState<View>('DASHBOARD');
-  const [projects, setProjects] = useState<Project[]>(INITIAL_PROJECTS);
-  const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [resetToken, setResetToken] = useState<string | null>(null);
@@ -328,6 +327,9 @@ const App: React.FC = () => {
     const optimisticTask = { ...task, id: tempId };
     setTasks(prev => [optimisticTask, ...prev]);
 
+    console.log('🚀 Creating task:', task.title);
+    console.log('📦 Task payload:', task);
+
     try {
        const payload = {
          title: task.title,
@@ -337,13 +339,29 @@ const App: React.FC = () => {
          due_date: task.dueDate,
          project_id: task.projectId ? parseInt(task.projectId) : undefined
        };
+       
+       console.log('📤 Sending to API:', payload);
+       
        const response = await apiService.createTask(payload);
+       
+       console.log('📥 API Response:', response);
+       
        if (response.success) {
           const newTask = response.data.task;
+          console.log('✅ Task created successfully:', newTask);
           setTasks(prev => prev.map(t => t.id === tempId ? { ...t, id: newTask.id.toString() } : t));
+       } else {
+          console.error('❌ API returned success:false', response);
+          // Revert optimistic update
+          setTasks(prev => prev.filter(t => t.id !== tempId));
        }
-    } catch (e) {
-       console.error("Failed to commit task:", e);
+    } catch (e: any) {
+       console.error('❌ Failed to commit task:', e);
+       console.error('Error details:', {
+         message: e.message,
+         response: e.response?.data,
+         status: e.response?.status
+       });
        // Revert optimistic
        setTasks(prev => prev.filter(t => t.id !== tempId));
     }

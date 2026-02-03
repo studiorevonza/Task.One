@@ -599,14 +599,14 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, addTask, updateTaskSta
                             <label className="text-xs font-bold text-slate-600 uppercase tracking-widest">Timeline Configuration</label>
                         </div>
                         
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-4">
                             {/* Due Date & Time */}
                             <div className="space-y-3">
                                 <div className="text-xs font-bold text-slate-700 flex items-center gap-2">
                                     <Calendar size={16} className="text-blue-500" />
                                     Due Date & Time
                                 </div>
-                                <div className="flex gap-2">
+                                <div className="flex flex-col sm:flex-row gap-3">
                                     <div className="relative flex-1">
                                         <input 
                                         type="date" 
@@ -617,12 +617,13 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, addTask, updateTaskSta
                                         />
                                         <Calendar size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                                     </div>
-                                    <div className="relative w-32">
+                                    <div className="relative sm:w-40">
                                         <input 
                                         type="time" 
                                         className="w-full bg-white border-2 border-slate-200 rounded-2xl px-4 py-4 text-slate-700 font-bold focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all shadow-sm hover:shadow-md"
                                         value={newTaskDueTime}
                                         onChange={(e) => setNewTaskDueTime(e.target.value)}
+                                        placeholder="--:--"
                                         />
                                     </div>
                                 </div>
