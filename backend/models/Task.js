@@ -27,11 +27,39 @@ const taskSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  assigned_by: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User', // Admin who assigned the task
+    required: false
+  },
   assigned_to: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    default: null
-  }
+    ref: 'User', // User who receives the task
+    required: false
+  },
+  assigned_at: {
+    type: Date,
+    default: Date.now
+  },
+  updated_by: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User' // Last person who updated the task
+  },
+  progress_updates: [{
+    status: {
+      type: String,
+      enum: ['todo', 'in_progress', 'completed', 'cancelled']
+    },
+    updated_by: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    updated_at: {
+      type: Date,
+      default: Date.now
+    },
+    notes: String
+  }]
 }, {
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
 });

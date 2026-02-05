@@ -19,8 +19,13 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    default: 'Product Designer'
+    enum: ['user', 'admin'],
+    default: 'user'
   },
+  assigned_tasks: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Task'
+  }],
   avatar_url: {
     type: String,
     default: ''

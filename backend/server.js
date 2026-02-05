@@ -13,6 +13,8 @@ const timeRoutes = require('./routes/time');
 const categoryRoutes = require('./routes/categories');
 const tagRoutes = require('./routes/tags');
 const notificationRoutes = require('./routes/notifications');
+const adminTaskRoutes = require('./routes/adminTasks');  // New admin task routes
+const userTaskRoutes = require('./routes/userTasks');    // New user task routes
 
 const { errorHandler } = require('./middleware/errorHandler');
 const { notFound } = require('./middleware/notFound');
@@ -31,10 +33,22 @@ const io = new Server(server, {
   }
 });
 
-// Neural Socket Connection
+// Neural Socket Connection with user authentication
 io.on('connection', (socket) => {
   console.log('📡 Neural Link Established:', socket.id);
   
+  // Join user-specific room when user connects
+  socket.on('joinUserRoom', (userId) => {
+    socket.join(`user_${userId}`);
+    console.log(`👤 User ${userId} joined room user_${userId}`);
+  });
+
+  // Leave user-specific room when user disconnects
+  socket.on('leaveUserRoom', (userId) => {
+    socket.leave(`user_${userId}`);
+    console.log(`👤 User ${userId} left room user_${userId}`);
+  });
+
   socket.on('disconnect', () => {
     console.log('🔌 Neural Link Severed:', socket.id);
   });
@@ -67,7 +81,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-  const { getDbConnected } = require('./utils/dbHelper');
+  const { isDbConnected } = require('./utils/dbHelper');
   
   res.json({
     status: 'OK',
@@ -76,13 +90,13 @@ app.get('/api/health', (req, res) => {
     environment: process.env.NODE_ENV || 'development',
     version: process.env.npm_package_version || '1.0.0',
     database: {
-      connected: getDbConnected(),
+      connected: isDbConnected(),
       type: process.env.MONGO_LOCAL === "1" ? 'local' : 'atlas'
     },
     services: {
       express: true,
       socketIO: true,
-      mongodb: getDbConnected()
+      mongodb: isDbConnected()
     }
   });
 });
@@ -98,16 +112,16 @@ app.get('/', (req, res) => {
       auth: '/api/auth',
       users: '/api/users',
       projects: '/api/projects',
-      tasks: '/api/tasks'
+      tasks: '/api/tasks',
+      adminTasks: '/api/admin/tasks',  // New admin task endpoints
+      userTasks: '/api/user/tasks'     // New user task endpoints
     },
     timestamp: new Date().toISOString()
   });
 });
 
-// Initialize database connection
 const connectDB = require('./config/db');
 
-// Connect to MongoDB with error handling - DON'T let it crash the app
 let dbConnected = false;
 connectDB()
   .then(() => {
@@ -118,7 +132,6 @@ connectDB()
   .catch((error) => {
     console.error('❌ Database connection failed:', error.message);
     console.warn('⚠️ Running in development with limited functionality');
-    // Don't exit the process - app continues with in-memory storage
     dbConnected = false;
     setDbConnected(false); // Set connection status
   });
@@ -132,8 +145,9 @@ app.use('/api/time', timeRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/tags', tagRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/admin/tasks', adminTaskRoutes);  // New admin task routes
+app.use('/api/user/tasks', userTaskRoutes);    
 
-// Error handling middleware
 app.use(notFound);
 app.use(errorHandler);
 

@@ -33,7 +33,7 @@ router.post('/register', registerValidation, async (req, res, next) => {
       });
     }
 
-    const { name, email, password } = req.body;
+    const { name, email, password, role } = req.body;
 
     let userExists;
     if (isDbConnected()) {
@@ -60,7 +60,8 @@ router.post('/register', registerValidation, async (req, res, next) => {
         return await User.create({
           name,
           email,
-          password
+          password,
+          role: role || 'user' // Allow role to be set during registration
         });
       });
     } else {
@@ -69,7 +70,7 @@ router.post('/register', registerValidation, async (req, res, next) => {
         name,
         email,
         password,
-        role: 'Product Designer',
+        role: role || 'user', // Default to 'user' if not specified
         avatar_url: ''
       });
     }
@@ -96,7 +97,7 @@ router.post('/register', registerValidation, async (req, res, next) => {
           id: user.id,
           name: user.name,
           email: user.email,
-          role: user.role || 'Product Designer',
+          role: user.role || 'user',
           avatar_url: user.avatar_url || '',
           createdAt: user.created_at || new Date().toISOString()
         },
@@ -240,7 +241,7 @@ router.put('/profile', authenticateToken, async (req, res, next) => {
     const updateData = {};
     if (name) updateData.name = name;
     if (avatar_url !== undefined) updateData.avatar_url = avatar_url;
-    if (role) updateData.role = role;
+    if (role && req.user.role === 'admin') updateData.role = role; // Only admin can update role
     if (location !== undefined) updateData.location = location;
     if (bio !== undefined) updateData.bio = bio;
     if (website !== undefined) updateData.website = website;
@@ -281,7 +282,7 @@ router.put('/profile', authenticateToken, async (req, res, next) => {
           name: user.name,
           email: user.email,
           avatar_url: user.avatar_url || '',
-          role: user.role || 'Product Designer',
+          role: user.role || 'user',
           location: user.location,
           bio: user.bio,
           website: user.website,

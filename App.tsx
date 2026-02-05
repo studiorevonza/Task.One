@@ -337,7 +337,7 @@ const App: React.FC = () => {
          status: task.status === TaskStatus.TODO ? 'todo' : task.status === TaskStatus.IN_PROGRESS ? 'in_progress' : 'completed',
          priority: task.priority.toLowerCase(),
          due_date: task.dueDate,
-         project_id: task.projectId ? parseInt(task.projectId) : undefined
+         project_id: task.projectId ? task.projectId : undefined
        };
        
        console.log('📤 Sending to API:', payload);
