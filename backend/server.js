@@ -27,7 +27,9 @@ const { setDbConnected } = require('./utils/dbHelper');
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: process.env.CLIENT_URL || 'http://localhost:3000',
+    origin: process.env.NODE_ENV === 'production' 
+      ? ['https://tasq-one-frontend.onrender.com', 'https://tasq-one-backend.onrender.com']
+      : process.env.CLIENT_URL || 'http://localhost:3000',
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true
   }
@@ -71,10 +73,15 @@ const limiter = rateLimit({
 app.use(limiter);
 
 // Middleware
-app.use(cors({
-  origin: '*', // Allow all origins during development/troubleshooting
-  credentials: true
-}));
+const corsOptions = {
+  origin: process.env.NODE_ENV === 'production' 
+    ? ['https://tasq-one-frontend.onrender.com', 'https://tasq-one-backend.onrender.com']
+    : '*',
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+
+app.use(cors(corsOptions));
 app.use(morgan('combined'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));

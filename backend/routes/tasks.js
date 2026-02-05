@@ -170,10 +170,16 @@ router.post('/', authenticateToken, taskValidation, async (req, res, next) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('Task creation validation errors:', errors.array());
+      console.log('Request body:', req.body);
       return res.status(400).json({
         success: false,
         message: 'Validation errors',
-        errors: errors.array()
+        errors: errors.array(),
+        debug: {
+          requestBody: req.body,
+          validationErrors: errors.array()
+        }
       });
     }
 
@@ -248,10 +254,16 @@ router.put('/:id', authenticateToken, taskValidation, async (req, res, next) => 
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('Task validation errors:', errors.array());
+      console.log('Request body:', req.body);
       return res.status(400).json({
         success: false,
         message: 'Validation errors',
-        errors: errors.array()
+        errors: errors.array(),
+        debug: {
+          requestBody: req.body,
+          validationErrors: errors.array()
+        }
       });
     }
 

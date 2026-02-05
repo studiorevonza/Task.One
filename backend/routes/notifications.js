@@ -4,15 +4,21 @@ const nodemailer = require('nodemailer');
 const { authenticateToken } = require('../middleware/auth');
 
 // Configure nodemailer transporter
-// Note: In a real app, these should be in .env
 const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.ethereal.email',
-    port: process.env.SMTP_PORT || 587,
-    secure: false, 
-    auth: {
-        user: process.env.SMTP_USER || 'demo_user',
-        pass: process.env.SMTP_PASS || 'demo_pass',
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: parseInt(process.env.SMTP_PORT) || 587,
+    secure: false,
+    tls: {
+        rejectUnauthorized: false
     },
+    auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+    },
+    // Add timeout configuration for Render deployment
+    connectionTimeout: 30000,
+    greetingTimeout: 30000,
+    socketTimeout: 30000,
 });
 
 // @route   POST api/notifications/email
@@ -26,12 +32,22 @@ router.post('/email', authenticateToken, async (req, res) => {
     }
 
     try {
+        // Check if email configuration exists
+        if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+            console.warn('Email service not configured - skipping email send');
+            return res.json({ 
+                success: true, 
+                message: 'Notification processed (email service not configured)', 
+                messageId: 'mock-id-' + Date.now() 
+            });
+        }
+
         const mailOptions = {
-            from: '"TASQ.ONE Neural Sync" <notifications@tasq.one>',
+            from: process.env.SMTP_FROM || '"TASQ.ONE Neural Sync" <notifications@tasq.one>',
             to: to,
             subject: subject,
             html: `
-                <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; rounded-lg: 20px;">
+                <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 20px;">
                     <h2 style="color: #0f172a; font-weight: 800; letter-spacing: -0.025em; font-size: 24px;">Neural Sync Alert</h2>
                     <p style="color: #64748b; font-size: 14px; line-height: 1.5;">Your workspace has detected an urgent operational requirement.</p>
                     
@@ -42,7 +58,7 @@ router.post('/email', authenticateToken, async (req, res) => {
 
                     <p style="color: #334155; font-size: 15px;">${body}</p>
                     
-                    <div style="margin-top: 30px; pt: 20px; border-top: 1px solid #f1f5f9;">
+                    <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #f1f5f9;">
                         <p style="color: #94a3b8; font-size: 11px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.1em;">TASQ.ONE NEURAL COMMAND CENTER</p>
                     </div>
                 </div>
@@ -50,9 +66,9 @@ router.post('/email', authenticateToken, async (req, res) => {
         };
 
         const info = await transporter.sendMail(mailOptions);
-        console.log('Message sent: %s', info.messageId);
+        console.log('📧 Message sent: %s', info.messageId);
 
-        res.json({ success: true, messageId: info.messageId });
+        res.json({ success: true, messageId: info.messageId, message: 'Email sent successfully' });
     } catch (error) {
         console.error('Email error:', error);
         res.status(500).json({ success: false, message: 'Failed to send email', error: error.message });
