@@ -555,10 +555,12 @@ const App: React.FC = () => {
                </span>
             </div>
             <div className="flex items-center gap-3">
-               <NotificationCenter 
-                  notifications={deadlineAlerts} 
-                  onClear={(idx) => setDeadlineAlerts(prev => prev.filter((_, i) => i !== idx))} 
-               />
+               <div className="relative z-50">
+                  <NotificationCenter 
+                     notifications={deadlineAlerts} 
+                     onClear={(idx) => setDeadlineAlerts(prev => prev.filter((_, i) => i !== idx))} 
+                  />
+               </div>
                <button 
                 onClick={() => setCurrentView('PROFILE')} 
                 className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-sm shadow-lg shadow-slate-900/20 transform active:scale-95 transition-all"
@@ -571,10 +573,12 @@ const App: React.FC = () => {
           <div className="flex-1 overflow-y-auto bg-slate-50 custom-scrollbar relative">
             {/* Desktop Global Header */}
             <div className="hidden md:flex absolute top-8 right-8 z-40 items-center gap-4">
-                <NotificationCenter 
-                    notifications={deadlineAlerts} 
-                    onClear={(idx) => setDeadlineAlerts(prev => prev.filter((_, i) => i !== idx))} 
-                />
+                <div className="relative z-50">
+                    <NotificationCenter 
+                        notifications={deadlineAlerts} 
+                        onClear={(idx) => setDeadlineAlerts(prev => prev.filter((_, i) => i !== idx))} 
+                    />
+                </div>
             </div>
             {renderContent()}
           </div>
