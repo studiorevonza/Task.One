@@ -257,10 +257,14 @@ const App: React.FC = () => {
   // Data Handlers
   const fetchAllData = async () => {
       try {
+        console.log('🔄 Fetching all data for user:', user?.id);
         const [tasksRes, projectsRes] = await Promise.all([
           apiService.getTasks(),
           apiService.getProjects()
         ]);
+
+        console.log('📥 Tasks response:', tasksRes);
+        console.log('📥 Projects response:', projectsRes);
 
         if (tasksRes.success) {
           const mappedTasks = tasksRes.data.tasks.map((t: any) => ({
@@ -274,11 +278,14 @@ const App: React.FC = () => {
             category: t.project_id ? (t.project_name?.includes('Personal') ? 'Personal' : 'Company') : 'Company', // simplified logic
             reminderMinutes: 0
           }));
+          console.log('✅ Mapped tasks:', mappedTasks.length);
           setTasks(mappedTasks);
         }
 
         if (projectsRes.success) {
-          const mappedProjects = projectsRes.data.map((p: any) => ({
+          const projectsData = projectsRes.data.projects || projectsRes.data;
+          console.log('📦 Raw projects data:', projectsData);
+          const mappedProjects = projectsData.map((p: any) => ({
              id: p.id.toString(),
              name: p.name,
              description: p.description,
@@ -288,11 +295,14 @@ const App: React.FC = () => {
              progress: p.progress || 0,
              milestones: []
           }));
+          console.log('✅ Mapped projects:', mappedProjects.length);
           setProjects(mappedProjects);
+        } else {
+          console.error('❌ Projects fetch failed:', projectsRes);
         }
 
       } catch (error) {
-        console.error('Failed to sync workspace:', error);
+        console.error('💥 Failed to sync workspace:', error);
       }
   };
 
@@ -495,7 +505,7 @@ const App: React.FC = () => {
           />
         );
       case 'CALENDAR':
-        return <CalendarView tasks={tasks} updateTask={updateTask} />;
+        return <CalendarView tasks={tasks} updateTask={updateTask} addTask={addTask} />;
       case 'WORKFLOW':
         return <WorkflowView tasks={tasks} updateTaskStatus={updateTaskStatus} />;
       case 'INTELLIGENCE':

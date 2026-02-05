@@ -1,18 +1,23 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { Task, Category, Priority, TaskStatus } from '../types';
 import { format, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, isToday as isTodayDate } from 'date-fns';
-import { ChevronLeft, ChevronRight, Bell, Calendar as CalendarIcon, Clock, ArrowRight, MoreHorizontal, Plus, Zap, Activity, Globe } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Bell, Calendar as CalendarIcon, Clock, ArrowRight, MoreHorizontal, Plus, Zap, Activity, Globe, X, Flag, Tag, AlignLeft } from 'lucide-react';
 
 interface CalendarViewProps {
   tasks: Task[];
   updateTask?: (id: string, updates: Partial<Task>) => void;
+  addTask?: (task: Task) => void;
 }
 
-const CalendarView: React.FC<CalendarViewProps> = ({ tasks, updateTask }) => {
+const CalendarView: React.FC<CalendarViewProps> = ({ tasks, updateTask, addTask }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [newTaskDescription, setNewTaskDescription] = useState('');
+  const [newTaskPriority, setNewTaskPriority] = useState<Priority>(Priority.MEDIUM);
+  const [newTaskCategory, setNewTaskCategory] = useState<Category>(Category.COMPANY);
 
   // Real-time clock
   useEffect(() => {
@@ -74,6 +79,36 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, updateTask }) => {
       reminderMinutes: newMinutes,
       reminderSent: false 
     });
+  };
+
+  const handleCreateTask = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTaskTitle.trim() || !addTask) return;
+
+    const newTask: Task = {
+      id: Date.now().toString(),
+      title: newTaskTitle,
+      description: newTaskDescription,
+      status: TaskStatus.TODO,
+      priority: newTaskPriority,
+      category: newTaskCategory,
+      dueDate: format(selectedDate, 'yyyy-MM-dd'),
+      dueTime: '09:00',
+      reminderMinutes: 0
+    };
+
+    addTask(newTask);
+    setNewTaskTitle('');
+    setNewTaskDescription('');
+    setNewTaskPriority(Priority.MEDIUM);
+    setNewTaskCategory(Category.COMPANY);
+    setIsCreateModalOpen(false);
+  };
+
+  const updateTaskStatus = (taskId: string, status: TaskStatus) => {
+    if (updateTask) {
+      updateTask(taskId, { status });
+    }
   };
 
   return (
@@ -237,7 +272,12 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, updateTask }) => {
                               <Bell size={14} fill={task.reminderMinutes ? "currentColor" : "none"} strokeWidth={3} />
                            </button>
                         </div>
-                        <h4 className={`text-lg font-bold text-slate-900 leading-tight mb-3 transition-opacity ${task.status === TaskStatus.DONE ? 'opacity-40 line-through' : ''}`}>
+                        <h4 
+                          className={`text-lg font-bold text-slate-900 leading-tight mb-3 transition-opacity cursor-pointer hover:underline ${
+                            task.status === TaskStatus.DONE ? 'opacity-40 line-through' : ''
+                          }`}
+                          onClick={() => updateTaskStatus(task.id, task.status === TaskStatus.DONE ? TaskStatus.TODO : TaskStatus.DONE)}
+                        >
                            {task.title}
                         </h4>
                         <div className="flex items-center gap-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
@@ -258,7 +298,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, updateTask }) => {
               </div>
 
               <div className="mt-8 pt-8 border-t border-slate-100 relative z-10">
-                 <button className="w-full h-16 flex items-center justify-center gap-4 bg-slate-900 text-white rounded-[1.5rem] font-bold text-xs uppercase tracking-[0.3em] shadow-2xl shadow-slate-300 hover:bg-black transition-all active:scale-95 group/btn">
+                 <button 
+                   onClick={() => setIsCreateModalOpen(true)}
+                   className="w-full h-16 flex items-center justify-center gap-4 bg-slate-900 text-white rounded-[1.5rem] font-bold text-xs uppercase tracking-[0.3em] shadow-2xl shadow-slate-300 hover:bg-black transition-all active:scale-95 group/btn"
+                 >
                     <Plus size={20} strokeWidth={4} className="group-hover/btn:rotate-90 transition-transform duration-500" />
                     Initialize Unit
                  </button>
@@ -267,6 +310,105 @@ const CalendarView: React.FC<CalendarViewProps> = ({ tasks, updateTask }) => {
         </div>
 
       </div>
+
+      {/* Create Task Modal */}
+      {isCreateModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm transition-all">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-fade-in overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                   <div className="p-2 bg-slate-900/10 rounded-lg text-slate-900">
+                      <Plus size={20} strokeWidth={2.5} />
+                   </div>
+                   Initialize New Unit
+                </h3>
+                <button 
+                  onClick={() => setIsCreateModalOpen(false)} 
+                  className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-full transition-colors"
+                >
+                  <X size={20} />
+                </button>
+            </div>
+
+            <form onSubmit={handleCreateTask} className="flex flex-col flex-1 overflow-hidden">
+              <div className="p-6 overflow-y-auto space-y-5">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 ml-1">Unit Title</label>
+                  <input 
+                    type="text" 
+                    required 
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-slate-800 font-medium focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 focus:bg-white outline-none transition-all placeholder:text-slate-400" 
+                    value={newTaskTitle} 
+                    onChange={(e) => setNewTaskTitle(e.target.value)} 
+                    placeholder="Enter unit title..."
+                    autoFocus 
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 ml-1">Description</label>
+                  <div className="relative">
+                    <textarea 
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 pl-10 text-slate-700 focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 focus:bg-white outline-none transition-all resize-none min-h-[100px]" 
+                      rows={3} 
+                      value={newTaskDescription} 
+                      onChange={(e) => setNewTaskDescription(e.target.value)} 
+                      placeholder="Describe the operational requirements..."
+                    />
+                    <AlignLeft className="absolute left-3.5 top-4 text-slate-400 pointer-events-none" size={18} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-5">
+                   <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 ml-1">Category</label>
+                      <div className="relative">
+                        <select 
+                          className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-xl p-3.5 pr-8 text-slate-700 font-medium focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 focus:bg-white outline-none transition-all" 
+                          value={newTaskCategory} 
+                          onChange={(e) => setNewTaskCategory(e.target.value as Category)}
+                        >
+                          <option value={Category.COMPANY}>Company</option>
+                          <option value={Category.PERSONAL}>Personal</option>
+                        </select>
+                        <Tag className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+                      </div>
+                   </div>
+                   <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 ml-1">Priority</label>
+                      <div className="relative">
+                        <select 
+                          className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-xl p-3.5 pr-8 text-slate-700 font-medium focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 focus:bg-white outline-none transition-all" 
+                          value={newTaskPriority} 
+                          onChange={(e) => setNewTaskPriority(e.target.value as Priority)}
+                        >
+                          {Object.values(Priority).map(p => <option key={p} value={p}>{p}</option>)}
+                        </select>
+                        <Flag className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+                      </div>
+                   </div>
+                </div>
+              </div>
+
+              <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-3 mt-auto">
+                <button 
+                  type="button" 
+                  onClick={() => setIsCreateModalOpen(false)} 
+                  className="px-5 py-2.5 text-slate-600 font-semibold hover:bg-white hover:shadow-sm hover:text-slate-800 rounded-xl transition-all text-sm border border-transparent hover:border-slate-200"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  className="px-6 py-2.5 bg-slate-900 text-white font-semibold rounded-xl hover:bg-black shadow-lg shadow-slate-900/20 active:scale-95 transition-all text-sm flex items-center gap-2"
+                >
+                  <Plus size={18} strokeWidth={2.5} /> Create Unit
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
