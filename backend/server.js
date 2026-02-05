@@ -37,22 +37,22 @@ const io = new Server(server, {
 
 // Neural Socket Connection with user authentication
 io.on('connection', (socket) => {
-  console.log('📡 Neural Link Established:', socket.id);
+  console.log('📡 TASQ.ONE Link Established:', socket.id);
   
   // Join user-specific room when user connects
   socket.on('joinUserRoom', (userId) => {
     socket.join(`user_${userId}`);
-    console.log(`👤 User ${userId} joined room user_${userId}`);
+    console.log(`👤 User ${userId} joined TASQ.ONE room user_${userId}`);
   });
 
   // Leave user-specific room when user disconnects
   socket.on('leaveUserRoom', (userId) => {
     socket.leave(`user_${userId}`);
-    console.log(`👤 User ${userId} left room user_${userId}`);
+    console.log(`👤 User ${userId} left TASQ.ONE room user_${userId}`);
   });
 
   socket.on('disconnect', () => {
-    console.log('🔌 Neural Link Severed:', socket.id);
+    console.log('🔌 TASQ.ONE Link Severed:', socket.id);
   });
 });
 
@@ -161,7 +161,7 @@ app.use(errorHandler);
 // Start server
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
-  console.log(`🚀 Neural Engine Synchronized on port ${PORT}`);
+  console.log(`🚀 TASQONE Engine Synchronized on port ${PORT}`);
   console.log(`📡 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🔗 API Health: http://localhost:${PORT}/api/health`);
   if (dbConnected) {

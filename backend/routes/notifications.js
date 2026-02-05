@@ -48,7 +48,7 @@ router.post('/email', authenticateToken, async (req, res) => {
             subject: subject,
             html: `
                 <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 20px;">
-                    <h2 style="color: #0f172a; font-weight: 800; letter-spacing: -0.025em; font-size: 24px;">Neural Sync Alert</h2>
+                    <h2 style="color: #0f172a; font-weight: 800; letter-spacing: -0.025em; font-size: 24px;">TASQ.ONE Alert</h2>
                     <p style="color: #64748b; font-size: 14px; line-height: 1.5;">Your workspace has detected an urgent operational requirement.</p>
                     
                     <div style="background-color: #f8fafc; padding: 20px; border-radius: 12px; margin: 20px 0; border-left: 4px solid #6366f1;">
@@ -59,7 +59,7 @@ router.post('/email', authenticateToken, async (req, res) => {
                     <p style="color: #334155; font-size: 15px;">${body}</p>
                     
                     <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #f1f5f9;">
-                        <p style="color: #94a3b8; font-size: 11px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.1em;">TASQ.ONE NEURAL COMMAND CENTER</p>
+                        <p style="color: #94a3b8; font-size: 11px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.1em;">TASQ.ONE COMMAND CENTER</p>
                     </div>
                 </div>
             `

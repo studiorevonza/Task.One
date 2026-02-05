@@ -215,7 +215,7 @@ router.post('/', authenticateToken, taskValidation, async (req, res, next) => {
       // Emit Real-time signal
       if (req.app.get('io')) {
         req.app.get('io').emit('neural_alert', {
-          message: `System Alert: New Operational Unit initialized: "${title}"`,
+          message: `TASQ.ONE Alert: New Task Created: "${title}"`,
           taskTitle: title
         });
       }
@@ -299,7 +299,7 @@ router.put('/:id', authenticateToken, taskValidation, async (req, res, next) => 
       // Emit Real-time signal
       if (req.app.get('io')) {
         req.app.get('io').emit('neural_alert', {
-          message: `System Alert: Operational Unit "${title}" has been updated.`,
+          message: `TASQ.ONE Alert: Task "${title}" has been updated.`,
           taskTitle: title
         });
       }

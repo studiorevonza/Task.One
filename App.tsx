@@ -210,11 +210,11 @@ const App: React.FC = () => {
     });
     
     socket.on('neural_alert', (data: { message: string, taskTitle?: string }) => {
-      console.log('📡 Real-time Neural Alert Received:', data);
+      console.log('📡 Real-time TASQ.ONE Alert Received:', data);
       setDeadlineAlerts(prev => [data.message, ...prev]);
       
       if (Notification.permission === "granted") {
-        new Notification(data.taskTitle || "Neural System Update", {
+        new Notification(data.taskTitle || "TASQ.ONE System Update", {
           body: data.message,
           icon: '/logo.png'
         });
